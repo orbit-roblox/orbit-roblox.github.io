@@ -683,7 +683,7 @@ function setStep(id,status){
 function render(){
   const btn=$("gen-btn");
   if(state.busy){btn.disabled=true;btn.textContent="Working...";}
-  else if(!state.userId){btn.disabled=true;btn.textContent="Enter a username to generate";}
+  else if(!state.username.trim()){btn.disabled=true;btn.textContent="Enter a username to generate";}
   else{btn.disabled=false;btn.textContent="Generate & Upload Script →";}
   if(state.userId){$("userid-hint").style.display="block";$("userid-val").textContent=state.userId;}
   else{$("userid-hint").style.display="none";}
@@ -716,6 +716,14 @@ $("username-input").addEventListener("input",e=>{
       if(res.ok){
         const data=await res.json();
         const results=(data.data||[]).slice(0,5);
+        // Auto-select exact username match (case-insensitive)
+        const exact=results.find(u=>u.name.toLowerCase()===state.username.toLowerCase());
+        if(exact){
+          state.userId=String(exact.id);
+          $("username-input").value=exact.name;
+          state.username=exact.name;
+          render();return;
+        }
         if(results.length>0){
           $("user-dropdown").innerHTML=results.map(u=>`<div class="dd-item" data-id="${u.id}" data-name="${u.name}"><div class="dd-avatar">${u.name[0].toUpperCase()}</div><div><div class="dd-name">${u.displayName||u.name}</div><div class="dd-id">@${u.name} · ${u.id}</div></div></div>`).join("");
           $("user-dropdown").classList.add("open");
@@ -855,6 +863,20 @@ $("gen-btn").addEventListener("click",async()=>{
   render();
   let finalCode;
   try{
+    // If userId wasn't resolved yet, look it up now
+    if(!state.userId&&state.username){
+      try{
+        const proxy="https://corsproxy.io/?url="+encodeURIComponent(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(state.username)}&limit=5`);
+        const res=await fetch(proxy);
+        if(res.ok){
+          const data=await res.json();
+          const exact=(data.data||[]).find(u=>u.name.toLowerCase()===state.username.toLowerCase());
+          if(exact)state.userId=String(exact.id);
+          else if(data.data&&data.data[0])state.userId=String(data.data[0].id);
+        }
+      }catch(e){}
+      if(!state.userId){showAlert("Could not resolve User ID for '"+state.username+"'. Select from the dropdown.","err");state.busy=false;render();return;}
+    }
     setStep("step-build","active");
     await sleep(200);
     const raw=buildScript();
