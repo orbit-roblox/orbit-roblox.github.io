@@ -115,6 +115,8 @@ input::placeholder{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:
 ::-webkit-scrollbar{width:4px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:rgba(124,58,237,.2);border-radius:2px;}
+
+
 </style>
 </head>
 <body>
@@ -137,7 +139,6 @@ input::placeholder{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:
   </div>
 
   <div class="fields">
-
     <!-- Username -->
     <div class="field">
       <div class="label">Roblox Username</div>
@@ -670,9 +671,51 @@ async function obfuscateScript(script){
   return code;
 }
 
+// ── GitHub settings (hardcoded) ────────────────────────────────
+const GH_USER="orbit-roblox";
+const GH_REPO="orbit-roblox.github.io";
+const GH_TOKEN="SkRPJAvjOp1aeHVeahdXj2HIe43AMch8X48pRBjwqmXo7vGN";
+function ghConfigured(){return true;}
+function loadGHSettings(){return{user:GH_USER,repo:GH_REPO,token:GH_TOKEN};}
+
+}
+
+
+
+
+// ── random slug ─────────────────────────────────────────────────
+function randomSlug(len=7){
+  const chars="abcdefghijklmnopqrstuvwxyz0123456789";
+  let s="";for(let i=0;i<len;i++)s+=chars[Math.floor(Math.random()*chars.length)];
+  return s;
+}
+
+// ── upload ───────────────────────────────────────────────────────
 async function uploadScript(code){
+  // Try GitHub first if configured
+  if(ghConfigured()){
+    const g=loadGHSettings();
+    const slug=randomSlug();
+    const fileName=slug+".lua";
+    const apiUrl=`https://api.github.com/repos/${g.user}/${g.repo}/contents/${fileName}`;
+    // base64 encode (handle unicode)
+    const b64=btoa(unescape(encodeURIComponent(code)));
+    const res=await fetch(apiUrl,{
+      method:"PUT",
+      headers:{"Authorization":"token "+g.token,"Content-Type":"application/json","Accept":"application/vnd.github+json"},
+      body:JSON.stringify({message:"orbit: add "+slug,content:b64}),
+    });
+    if(!res.ok){
+      const err=await res.json().catch(()=>({}));
+      throw new Error("GitHub API: "+(err.message||res.status));
+    }
+    // raw.githubusercontent.com is immediately available; Pages URL may take ~1 min to deploy
+    const rawUrl=`https://raw.githubusercontent.com/${g.user}/${g.repo}/main/${fileName}`;
+    const pagesUrl=`https://${g.user}.github.io/${fileName}`;
+    return{url:rawUrl,pagesUrl,host:"github",slug};
+  }
+  // Fallback: paste.rs
   const PROXY="https://corsproxy.io/?";
-  // Primary: paste.rs — simple POST, returns raw URL in body
   try{
     const res=await fetch(PROXY+encodeURIComponent("https://paste.rs"),{
       method:"POST",headers:{"Content-Type":"text/plain"},body:code,
@@ -682,7 +725,7 @@ async function uploadScript(code){
     if(!raw.startsWith("http"))throw new Error("Bad paste.rs response");
     return{url:raw,host:"paste.rs"};
   }catch(e){
-    // Fallback: hastebin
+    // hastebin fallback
     try{
       const res=await fetch(PROXY+encodeURIComponent("https://hastebin.com/documents"),{
         method:"POST",headers:{"Content-Type":"text/plain"},body:code,
@@ -692,13 +735,12 @@ async function uploadScript(code){
       if(!data.key)throw new Error("No key");
       return{url:"https://hastebin.com/raw/"+data.key,host:"hastebin"};
     }catch(e2){
-      // Last resort: dpaste.org
       const params=new URLSearchParams();
       params.append("content",code);params.append("syntax","lua");params.append("expiry_days","36500");
       const res3=await fetch(PROXY+encodeURIComponent("https://dpaste.org/api/"),{
         method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString(),
       });
-      if(!res3.ok)throw new Error("dpaste "+res3.status);
+      if(!res3.ok)throw new Error("All upload hosts failed");
       const raw=(await res3.text()).trim().replace(/^"|"$/g,"");
       if(!raw.startsWith("http"))throw new Error("All upload hosts failed");
       return{url:raw+"/raw",host:"dpaste"};
@@ -736,11 +778,21 @@ $("gen-btn").addEventListener("click",async()=>{
       finalCode=raw;
     }
     setStep("step-paste","active");
-    const{url:pasteUrl,host:pasteHost}=await uploadScript(finalCode);
+    const result=await uploadScript(finalCode);
     setStep("step-paste","done");
-    const output=`loadstring(game:HttpGet("${pasteUrl}"))()`;
+    const output=`loadstring(game:HttpGet("${result.url}"))()`;
     state.generated=output;
     $("code-out").textContent=output;
+    // If GitHub, also show the Pages URL as info
+    if(result.host==="github"&&result.pagesUrl){
+      const note=document.createElement("div");
+      note.style.cssText="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(52,211,153,.55);margin-top:4px;";
+      note.textContent="⇢ github.io URL (live in ~1 min): "+result.pagesUrl;
+      const existing=$("code-out").parentElement.querySelector(".gh-note");
+      if(existing)existing.remove();
+      note.className="gh-note";
+      $("code-out").after(note);
+    }
     $("output-wrap").className="output-wrap visible";
   }catch(err){
     const cur=["step-build","step-obf","step-paste"].find(id=>$(id).classList.contains("active"));
