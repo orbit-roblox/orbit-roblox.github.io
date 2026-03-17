@@ -1,15 +1,16 @@
-local Players = game:GetService("Players")
-local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
+local Players         = game:GetService("Players")
+local CoreGui         = game:GetService("CoreGui")
+local TweenService    = game:GetService("TweenService")
+local UserInputService= game:GetService("UserInputService")
+local RunService      = game:GetService("RunService")
+local LocalPlayer     = Players.LocalPlayer
 
 -- ==========================================
--- 🖼️ CUSTOM ASSET DOWNLOADER (No Studio Needed!)
+-- 🖼️ CUSTOM ASSET DOWNLOADER
 -- ==========================================
-local imageURL = "https://tr.rbxcdn.com/180DAY-e03fae3ffce52f4432de392082fa43b7/420/420/Image/Png/noFilter"
-local ITEM_IMAGE_ID = ""
-local ROBUX_ICON_ID = "rbxasset://textures/ui/common/robux_small.png"
+local imageURL    = "https://tr.rbxcdn.com/180DAY-e03fae3ffce52f4432de392082fa43b7/420/420/Image/Png/noFilter"
+local ITEM_IMAGE_ID  = ""
+local ROBUX_ICON_ID  = "rbxasset://textures/ui/common/robux_small.png"
 
 local successCustomAsset, result = pcall(function()
     local fileName = "admin_commands_icon.png"
@@ -17,35 +18,102 @@ local successCustomAsset, result = pcall(function()
         local imageData = game:HttpGetAsync(imageURL)
         writefile(fileName, imageData)
     end
-    if getcustomasset then
-        return getcustomasset(fileName)
-    end
+    if getcustomasset then return getcustomasset(fileName) end
 end)
-
-if successCustomAsset and result then
-    ITEM_IMAGE_ID = result
-else
-    ITEM_IMAGE_ID = "rbxassetid://0"
-end
+ITEM_IMAGE_ID = (successCustomAsset and result) and result or "rbxassetid://0"
 
 local success = pcall(function() return CoreGui.Name end)
 local targetParent = success and CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
-if targetParent:FindFirstChild("CustomPurchaseUI_Control") then
-    targetParent.CustomPurchaseUI_Control:Destroy()
-end
-if targetParent:FindFirstChild("CustomPurchaseUI") then
-    targetParent.CustomPurchaseUI:Destroy()
+for _, n in ipairs({"CustomPurchaseUI_Control","CustomPurchaseUI","CustomPurchaseUI_Settings"}) do
+    if targetParent:FindFirstChild(n) then targetParent:FindFirstChild(n):Destroy() end
 end
 
 -- ==========================================
--- SCRIPT STATE & VARIABLES
+-- THEME PALETTE
 -- ==========================================
-local scriptEnabled = true
-local currentBalance = 5641388
-local giftTarget = "Player"
-local hookedButtons = {}
-local toggleKeybind = Enum.KeyCode.RightControl
+local BLACK   = Color3.fromRGB(  0,   0,   0)
+local DKGREY  = Color3.fromRGB( 14,  14,  14)
+local MGREY   = Color3.fromRGB( 26,  26,  26)
+local LGREY   = Color3.fromRGB( 48,  48,  48)
+local WHITE   = Color3.fromRGB(255, 255, 255)
+local PURPLE  = Color3.fromRGB(150,  60, 255)
+local PURPLE2 = Color3.fromRGB( 90,  20, 180)
+local GREEN   = Color3.fromRGB( 60, 210, 100)
+local RED     = Color3.fromRGB(215,  55,  70)
+local TXLO    = Color3.fromRGB(110, 110, 110)
+
+-- ==========================================
+-- HELPERS
+-- ==========================================
+local function corner(p, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, r or 6)
+    c.Parent = p
+    return c
+end
+
+local function outline(p, col, thick)
+    local s = Instance.new("UIStroke")
+    s.Color           = col or LGREY
+    s.Thickness       = thick or 1
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent          = p
+    return s
+end
+
+local function hoverTween(btn, hoverCol, baseCol)
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = hoverCol}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = baseCol}):Play()
+    end)
+end
+
+-- ==========================================
+-- WAVE GRADIENT
+-- ==========================================
+local function buildWaveGradient(parent)
+    local g    = Instance.new("UIGradient")
+    g.Rotation = 45
+    g.Parent   = parent
+    return g
+end
+
+local function getWaveSequence(shift)
+    local c0 = Color3.fromRGB(  0,   0,   0)   -- black
+    local c1 = Color3.fromRGB( 14,   2,  30)   -- near-black purple
+    local c2 = Color3.fromRGB( 40,   8,  80)   -- deep purple
+    local c3 = Color3.fromRGB( 90,  20, 170)   -- mid-bright purple
+    local c4 = Color3.fromRGB( 50,  10, 110)   -- medium-dark purple
+    local c5 = Color3.fromRGB( 18,   2,  40)   -- very dark purple
+    local kp = {}
+    local N  = 20
+    for i = 0, N do
+        local x     = i / N
+        local phase = ((x - shift) % 1 + 1) % 1
+        local c
+        if     phase < 0.15 then c = c0:Lerp(c1,  phase / 0.15)
+        elseif phase < 0.30 then c = c1:Lerp(c2, (phase-0.15)/0.15)
+        elseif phase < 0.45 then c = c2:Lerp(c3, (phase-0.30)/0.15)
+        elseif phase < 0.60 then c = c3:Lerp(c4, (phase-0.45)/0.15)
+        elseif phase < 0.75 then c = c4:Lerp(c5, (phase-0.60)/0.15)
+        else                     c = c5:Lerp(c0, (phase-0.75)/0.25)
+        end
+        table.insert(kp, ColorSequenceKeypoint.new(math.min(x, 1), c))
+    end
+    return ColorSequence.new(kp)
+end
+
+-- ==========================================
+-- SCRIPT STATE
+-- ==========================================
+local scriptEnabled     = true
+local currentBalance    = 5641388
+local giftTarget        = "Player"
+local hookedButtons     = {}
+local toggleKeybind     = Enum.KeyCode.RightControl
 local isListeningForKey = false
 
 local function FormatNumber(n)
@@ -54,216 +122,452 @@ local function FormatNumber(n)
     return minus .. int:reverse():gsub("^,", "") .. fraction
 end
 
-local function getGiftTargetUser()
-    for _, element in pairs(LocalPlayer:WaitForChild("PlayerGui"):GetDescendants()) do
-        if (element:IsA("TextLabel") or element:IsA("TextBox")) and element.Visible then
-            local text = element.Text
-            local foundUser = text:match("@[%w_]+")
-            if foundUser then
-                return foundUser
-            end
-        end
-    end
-    return "a player"
-end
-
 -- ==========================================
--- CONTROL PANEL UI
+-- CONTROL PANEL
 -- ==========================================
 local controlGui = Instance.new("ScreenGui")
-controlGui.Name = "CustomPurchaseUI_Control"
-controlGui.ResetOnSpawn = false
-controlGui.Parent = targetParent
+controlGui.Name           = "CustomPurchaseUI_Control"
+controlGui.ResetOnSpawn   = false
+controlGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+controlGui.Parent         = targetParent
 
 local controlFrame = Instance.new("Frame")
-controlFrame.Name = "ControlFrame"
-controlFrame.Size = UDim2.new(0, 200, 0, 190)
-controlFrame.Position = UDim2.new(0, 20, 0, 20)
-controlFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-controlFrame.BorderSizePixel = 0
-controlFrame.Active = true
-controlFrame.Draggable = true
+controlFrame.Name             = "ControlFrame"
+controlFrame.Size             = UDim2.new(0, 224, 0, 10)
+controlFrame.Position         = UDim2.new(0, 20, 0, 20)
+controlFrame.BackgroundColor3 = BLACK
+controlFrame.BorderSizePixel  = 0
+controlFrame.Active           = true
 controlFrame.ClipsDescendants = true
-controlFrame.Parent = controlGui
+controlFrame.Parent           = controlGui
+corner(controlFrame, 10)
+outline(controlFrame, PURPLE, 1.5)
 
-local controlCorner = Instance.new("UICorner")
-controlCorner.CornerRadius = UDim.new(0, 8)
-controlCorner.Parent = controlFrame
+-- Wave bg layer
+local waveBg = Instance.new("Frame")
+waveBg.Size             = UDim2.new(1, 0, 1, 0)
+waveBg.BackgroundColor3 = BLACK
+waveBg.BorderSizePixel  = 0
+waveBg.ZIndex           = 1
+waveBg.Parent           = controlFrame
+corner(waveBg, 10)
+local waveGrad = buildWaveGradient(waveBg)
 
+-- Top bar
+local topBar = Instance.new("Frame")
+topBar.Size             = UDim2.new(1, 0, 0, 38)
+topBar.BackgroundColor3 = Color3.fromRGB(8, 0, 18)
+topBar.BorderSizePixel  = 0
+topBar.ZIndex           = 3
+topBar.Parent           = controlFrame
+corner(topBar, 10)
+
+local topFix = Instance.new("Frame")
+topFix.Size             = UDim2.new(1, 0, 0, 10)
+topFix.Position         = UDim2.new(0, 0, 1, -10)
+topFix.BackgroundColor3 = Color3.fromRGB(8, 0, 18)
+topFix.BorderSizePixel  = 0
+topFix.ZIndex           = 3
+topFix.Parent           = topBar
+
+-- Glowing separator line
+local topLine = Instance.new("Frame")
+topLine.Size             = UDim2.new(1, 0, 0, 1)
+topLine.Position         = UDim2.new(0, 0, 0, 38)
+topLine.BackgroundColor3 = PURPLE
+topLine.BorderSizePixel  = 0
+topLine.ZIndex           = 4
+topLine.Parent           = controlFrame
+local lineGrad = Instance.new("UIGradient")
+lineGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(30, 0, 60)),
+    ColorSequenceKeypoint.new(0.35, PURPLE),
+    ColorSequenceKeypoint.new(0.65, Color3.fromRGB(190, 110, 255)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(30, 0, 60)),
+})
+lineGrad.Parent = topLine
+
+-- Title
 local controlTitle = Instance.new("TextLabel")
-controlTitle.Size = UDim2.new(1, -30, 0, 25)
-controlTitle.Position = UDim2.new(0, 10, 0, 0)
+controlTitle.Size               = UDim2.new(1, -44, 1, 0)
+controlTitle.Position           = UDim2.new(0, 12, 0, 0)
 controlTitle.BackgroundTransparency = 1
-controlTitle.Text = "UI Controller"
-controlTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-controlTitle.Font = Enum.Font.GothamBold
-controlTitle.TextSize = 14
-controlTitle.TextXAlignment = Enum.TextXAlignment.Left
-controlTitle.Parent = controlFrame
+controlTitle.Text               = "Orbit's AP Visual"
+controlTitle.TextColor3         = WHITE
+controlTitle.Font               = Enum.Font.GothamBlack
+controlTitle.TextSize           = 13
+controlTitle.TextXAlignment     = Enum.TextXAlignment.Left
+controlTitle.ZIndex             = 4
+controlTitle.Parent             = topBar
+-- Subtle white-to-light-purple gradient on title
+local titleGrad = Instance.new("UIGradient")
+titleGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   WHITE),
+    ColorSequenceKeypoint.new(0.55, WHITE),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(195, 140, 255)),
+})
+titleGrad.Parent = controlTitle
 
+-- Minimize button
 local hideBtn = Instance.new("TextButton")
-hideBtn.Size = UDim2.new(0, 25, 0, 25)
-hideBtn.Position = UDim2.new(1, -25, 0, 0)
-hideBtn.BackgroundTransparency = 1
-hideBtn.Text = "X"
-hideBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-hideBtn.Font = Enum.Font.GothamBold
-hideBtn.TextSize = 16
-hideBtn.Parent = controlFrame
+hideBtn.Size             = UDim2.new(0, 22, 0, 22)
+hideBtn.Position         = UDim2.new(1, -30, 0.5, -11)
+hideBtn.BackgroundColor3 = MGREY
+hideBtn.Text             = "–"
+hideBtn.TextColor3       = WHITE
+hideBtn.Font             = Enum.Font.GothamBold
+hideBtn.TextSize         = 14
+hideBtn.AutoButtonColor  = false
+hideBtn.ZIndex           = 5
+hideBtn.Parent           = topBar
+corner(hideBtn, 6)
+outline(hideBtn, LGREY, 1)
+hoverTween(hideBtn, RED, MGREY)
 
+-- Drag
+do
+    local dragging, dragInput, dragStart, startPos
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = controlFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    topBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local d = input.Position - dragStart
+            controlFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
+            )
+        end
+    end)
+end
+
+-- ── Layout helpers ───────────────────────
+local CX = 10
+local CW = UDim2.new(1, -20, 0, 30)
+local S  = 36
+local cy = 48
+
+local BASE_BTN = Color3.fromRGB(12, 2, 24)
+local HOVR_BTN = Color3.fromRGB(24, 4, 48)
+
+-- Status row
+local statusRow = Instance.new("Frame")
+statusRow.Size             = CW
+statusRow.Position         = UDim2.new(0, CX, 0, cy)
+statusRow.BackgroundColor3 = BASE_BTN
+statusRow.BorderSizePixel  = 0
+statusRow.ZIndex           = 2
+statusRow.Parent           = controlFrame
+corner(statusRow, 7)
+outline(statusRow, LGREY, 1)
+
+local statusDot = Instance.new("Frame")
+statusDot.Size             = UDim2.new(0, 8, 0, 8)
+statusDot.Position         = UDim2.new(0, 10, 0.5, -4)
+statusDot.BackgroundColor3 = GREEN
+statusDot.BorderSizePixel  = 0
+statusDot.ZIndex           = 3
+statusDot.Parent           = statusRow
+corner(statusDot, 4)
+
+local statusText = Instance.new("TextLabel")
+statusText.Size               = UDim2.new(1, -26, 1, 0)
+statusText.Position           = UDim2.new(0, 24, 0, 0)
+statusText.BackgroundTransparency = 1
+statusText.Text               = "Script Active"
+statusText.TextColor3         = GREEN
+statusText.Font               = Enum.Font.GothamSemibold
+statusText.TextSize           = 10
+statusText.TextXAlignment     = Enum.TextXAlignment.Left
+statusText.ZIndex             = 3
+statusText.Parent             = statusRow
+
+cy = cy + S
+
+-- Toggle button
 local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1, -20, 0, 30)
-toggleBtn.Position = UDim2.new(0, 10, 0, 30)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 130, 255)
-toggleBtn.Text = "Script: ON"
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 14
-toggleBtn.Parent = controlFrame
+toggleBtn.Size             = CW
+toggleBtn.Position         = UDim2.new(0, CX, 0, cy)
+toggleBtn.BackgroundColor3 = BASE_BTN
+toggleBtn.Text             = "▶  Script: ON"
+toggleBtn.TextColor3       = GREEN
+toggleBtn.Font             = Enum.Font.GothamBold
+toggleBtn.TextSize         = 11
+toggleBtn.AutoButtonColor  = false
+toggleBtn.BorderSizePixel  = 0
+toggleBtn.ZIndex           = 2
+toggleBtn.Parent           = controlFrame
+corner(toggleBtn, 7)
+outline(toggleBtn, PURPLE2, 1)
+hoverTween(toggleBtn, HOVR_BTN, BASE_BTN)
 
-local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(0, 6)
-toggleCorner.Parent = toggleBtn
+cy = cy + S
+
+-- Section: Balance
+local balLabel = Instance.new("TextLabel")
+balLabel.Size               = UDim2.new(1, -20, 0, 14)
+balLabel.Position           = UDim2.new(0, CX, 0, cy)
+balLabel.BackgroundTransparency = 1
+balLabel.Text               = "  FAKE BALANCE"
+balLabel.TextColor3         = Color3.fromRGB(100, 50, 180)
+balLabel.Font               = Enum.Font.GothamSemibold
+balLabel.TextSize           = 8
+balLabel.TextXAlignment     = Enum.TextXAlignment.Left
+balLabel.ZIndex             = 2
+balLabel.Parent             = controlFrame
+cy = cy + 16
 
 local balanceInput = Instance.new("TextBox")
-balanceInput.Size = UDim2.new(1, -20, 0, 30)
-balanceInput.Position = UDim2.new(0, 10, 0, 70)
-balanceInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-balanceInput.Text = tostring(currentBalance)
-balanceInput.PlaceholderText = "Set Fake Balance"
-balanceInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-balanceInput.Font = Enum.Font.Gotham
-balanceInput.TextSize = 14
+balanceInput.Size             = CW
+balanceInput.Position         = UDim2.new(0, CX, 0, cy)
+balanceInput.BackgroundColor3 = BASE_BTN
+balanceInput.Text             = tostring(currentBalance)
+balanceInput.PlaceholderText  = "Enter balance..."
+balanceInput.TextColor3       = WHITE
+balanceInput.PlaceholderColor3= TXLO
+balanceInput.Font             = Enum.Font.GothamSemibold
+balanceInput.TextSize         = 11
 balanceInput.ClearTextOnFocus = false
-balanceInput.Parent = controlFrame
+balanceInput.BorderSizePixel  = 0
+balanceInput.ZIndex           = 2
+balanceInput.Parent           = controlFrame
+corner(balanceInput, 7)
+outline(balanceInput, LGREY, 1)
+cy = cy + S
 
-local inputCorner = Instance.new("UICorner")
-inputCorner.CornerRadius = UDim.new(0, 6)
-inputCorner.Parent = balanceInput
+-- Section: Gift Target
+local giftLabel = Instance.new("TextLabel")
+giftLabel.Size               = UDim2.new(1, -20, 0, 14)
+giftLabel.Position           = UDim2.new(0, CX, 0, cy)
+giftLabel.BackgroundTransparency = 1
+giftLabel.Text               = "  GIFT TARGET"
+giftLabel.TextColor3         = Color3.fromRGB(100, 50, 180)
+giftLabel.Font               = Enum.Font.GothamSemibold
+giftLabel.TextSize           = 8
+giftLabel.TextXAlignment     = Enum.TextXAlignment.Left
+giftLabel.ZIndex             = 2
+giftLabel.Parent             = controlFrame
+cy = cy + 16
 
-local settingsBtn = Instance.new("TextButton")
-settingsBtn.Size = UDim2.new(1, -20, 0, 30)
-settingsBtn.Position = UDim2.new(0, 10, 0, 150)
-settingsBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
-settingsBtn.Text = "⚙  Settings"
-settingsBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
-settingsBtn.Font = Enum.Font.Gotham
-settingsBtn.TextSize = 13
-settingsBtn.Parent = controlFrame
-
-local settingsCorner = Instance.new("UICorner")
-settingsCorner.CornerRadius = UDim.new(0, 6)
-settingsCorner.Parent = settingsBtn
-
--- Gift username input
 local giftInput = Instance.new("TextBox")
-giftInput.Size = UDim2.new(1, -20, 0, 30)
-giftInput.Position = UDim2.new(0, 10, 0, 110)
-giftInput.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-giftInput.Text = giftTarget
-giftInput.PlaceholderText = "Gift Target Username"
-giftInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-giftInput.Font = Enum.Font.Gotham
-giftInput.TextSize = 14
+giftInput.Size             = CW
+giftInput.Position         = UDim2.new(0, CX, 0, cy)
+giftInput.BackgroundColor3 = BASE_BTN
+giftInput.Text             = giftTarget
+giftInput.PlaceholderText  = "Username..."
+giftInput.TextColor3       = WHITE
+giftInput.PlaceholderColor3= TXLO
+giftInput.Font             = Enum.Font.GothamSemibold
+giftInput.TextSize         = 11
 giftInput.ClearTextOnFocus = false
-giftInput.Parent = controlFrame
+giftInput.BorderSizePixel  = 0
+giftInput.ZIndex           = 2
+giftInput.Parent           = controlFrame
+corner(giftInput, 7)
+outline(giftInput, LGREY, 1)
+cy = cy + S
 
-local giftInputCorner = Instance.new("UICorner")
-giftInputCorner.CornerRadius = UDim.new(0, 6)
-giftInputCorner.Parent = giftInput
+-- Divider
+local divider = Instance.new("Frame")
+divider.Size             = UDim2.new(1, -20, 0, 1)
+divider.Position         = UDim2.new(0, CX, 0, cy + 4)
+divider.BackgroundColor3 = Color3.fromRGB(50, 10, 90)
+divider.BorderSizePixel  = 0
+divider.ZIndex           = 2
+divider.Parent           = controlFrame
+cy = cy + 14
+
+-- Settings button
+local settingsBtn = Instance.new("TextButton")
+settingsBtn.Size             = CW
+settingsBtn.Position         = UDim2.new(0, CX, 0, cy)
+settingsBtn.BackgroundColor3 = BASE_BTN
+settingsBtn.Text             = "⚙  Settings"
+settingsBtn.TextColor3       = Color3.fromRGB(160, 80, 255)
+settingsBtn.Font             = Enum.Font.GothamSemibold
+settingsBtn.TextSize         = 11
+settingsBtn.AutoButtonColor  = false
+settingsBtn.BorderSizePixel  = 0
+settingsBtn.ZIndex           = 2
+settingsBtn.Parent           = controlFrame
+corner(settingsBtn, 7)
+outline(settingsBtn, LGREY, 1)
+hoverTween(settingsBtn, HOVR_BTN, BASE_BTN)
+cy = cy + S + 8
+
+controlFrame.Size = UDim2.new(0, 224, 0, cy)
 
 -- ==========================================
 -- SETTINGS UI
 -- ==========================================
 local settingsGui = Instance.new("ScreenGui")
-settingsGui.Name = "CustomPurchaseUI_Settings"
-settingsGui.ResetOnSpawn = false
-settingsGui.Parent = targetParent
+settingsGui.Name           = "CustomPurchaseUI_Settings"
+settingsGui.ResetOnSpawn   = false
+settingsGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+settingsGui.Parent         = targetParent
 
 local settingsFrame = Instance.new("Frame")
-settingsFrame.Name = "SettingsFrame"
-settingsFrame.Size = UDim2.new(0, 220, 0, 130)
-settingsFrame.Position = UDim2.new(0, 230, 0, 20)
-settingsFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-settingsFrame.BorderSizePixel = 0
-settingsFrame.Active = true
-settingsFrame.Draggable = true
+settingsFrame.Name             = "SettingsFrame"
+settingsFrame.Size             = UDim2.new(0, 210, 0, 116)
+settingsFrame.Position         = UDim2.new(0, 254, 0, 20)
+settingsFrame.BackgroundColor3 = BLACK
+settingsFrame.BorderSizePixel  = 0
+settingsFrame.Active           = true
 settingsFrame.ClipsDescendants = true
-settingsFrame.Visible = false
-settingsFrame.Parent = settingsGui
+settingsFrame.Visible          = false
+settingsFrame.Parent           = settingsGui
+corner(settingsFrame, 10)
+outline(settingsFrame, PURPLE, 1.5)
 
-local settingsFrameCorner = Instance.new("UICorner")
-settingsFrameCorner.CornerRadius = UDim.new(0, 8)
-settingsFrameCorner.Parent = settingsFrame
+local sWaveBg = Instance.new("Frame")
+sWaveBg.Size             = UDim2.new(1, 0, 1, 0)
+sWaveBg.BackgroundColor3 = BLACK
+sWaveBg.BorderSizePixel  = 0
+sWaveBg.ZIndex           = 1
+sWaveBg.Parent           = settingsFrame
+corner(sWaveBg, 10)
+local sWaveGrad = buildWaveGradient(sWaveBg)
+
+local sTopBar = Instance.new("Frame")
+sTopBar.Size             = UDim2.new(1, 0, 0, 38)
+sTopBar.BackgroundColor3 = Color3.fromRGB(8, 0, 18)
+sTopBar.BorderSizePixel  = 0
+sTopBar.ZIndex           = 3
+sTopBar.Parent           = settingsFrame
+corner(sTopBar, 10)
+
+local sTopFix = Instance.new("Frame")
+sTopFix.Size             = UDim2.new(1, 0, 0, 10)
+sTopFix.Position         = UDim2.new(0, 0, 1, -10)
+sTopFix.BackgroundColor3 = Color3.fromRGB(8, 0, 18)
+sTopFix.BorderSizePixel  = 0
+sTopFix.ZIndex           = 3
+sTopFix.Parent           = sTopBar
+
+local sTopLine = Instance.new("Frame")
+sTopLine.Size             = UDim2.new(1, 0, 0, 1)
+sTopLine.Position         = UDim2.new(0, 0, 0, 38)
+sTopLine.BackgroundColor3 = PURPLE
+sTopLine.BorderSizePixel  = 0
+sTopLine.ZIndex           = 4
+sTopLine.Parent           = settingsFrame
+local sLineGrad = Instance.new("UIGradient")
+sLineGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(30, 0, 60)),
+    ColorSequenceKeypoint.new(0.5, PURPLE),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(30, 0, 60)),
+})
+sLineGrad.Parent = sTopLine
 
 local settingsTitle = Instance.new("TextLabel")
-settingsTitle.Size = UDim2.new(1, -40, 0, 30)
-settingsTitle.Position = UDim2.new(0, 10, 0, 0)
+settingsTitle.Size               = UDim2.new(1, -44, 1, 0)
+settingsTitle.Position           = UDim2.new(0, 12, 0, 0)
 settingsTitle.BackgroundTransparency = 1
-settingsTitle.Text = "⚙  Settings"
-settingsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-settingsTitle.Font = Enum.Font.GothamBold
-settingsTitle.TextSize = 13
-settingsTitle.TextXAlignment = Enum.TextXAlignment.Left
-settingsTitle.Parent = settingsFrame
+settingsTitle.Text               = "⚙  Settings"
+settingsTitle.TextColor3         = WHITE
+settingsTitle.Font               = Enum.Font.GothamBlack
+settingsTitle.TextSize           = 12
+settingsTitle.TextXAlignment     = Enum.TextXAlignment.Left
+settingsTitle.ZIndex             = 4
+settingsTitle.Parent             = sTopBar
 
 local settingsCloseBtn = Instance.new("TextButton")
-settingsCloseBtn.Size = UDim2.new(0, 25, 0, 25)
-settingsCloseBtn.Position = UDim2.new(1, -28, 0, 3)
-settingsCloseBtn.BackgroundTransparency = 1
-settingsCloseBtn.Text = "X"
-settingsCloseBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-settingsCloseBtn.Font = Enum.Font.GothamBold
-settingsCloseBtn.TextSize = 14
-settingsCloseBtn.Parent = settingsFrame
+settingsCloseBtn.Size             = UDim2.new(0, 22, 0, 22)
+settingsCloseBtn.Position         = UDim2.new(1, -30, 0.5, -11)
+settingsCloseBtn.BackgroundColor3 = MGREY
+settingsCloseBtn.Text             = "–"
+settingsCloseBtn.TextColor3       = WHITE
+settingsCloseBtn.Font             = Enum.Font.GothamBold
+settingsCloseBtn.TextSize         = 14
+settingsCloseBtn.AutoButtonColor  = false
+settingsCloseBtn.ZIndex           = 5
+settingsCloseBtn.Parent           = sTopBar
+corner(settingsCloseBtn, 6)
+outline(settingsCloseBtn, LGREY, 1)
+hoverTween(settingsCloseBtn, RED, MGREY)
 
-local divider = Instance.new("Frame")
-divider.Size = UDim2.new(1, -20, 0, 1)
-divider.Position = UDim2.new(0, 10, 0, 30)
-divider.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-divider.BorderSizePixel = 0
-divider.Parent = settingsFrame
+-- Settings drag
+do
+    local dragging, dragInput, dragStart, startPos
+    sTopBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true; dragStart = input.Position; startPos = settingsFrame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    sTopBar.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local d = input.Position - dragStart
+            settingsFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
+            )
+        end
+    end)
+end
 
-local keybindLabel = Instance.new("TextLabel")
-keybindLabel.Size = UDim2.new(1, -20, 0, 20)
-keybindLabel.Position = UDim2.new(0, 10, 0, 40)
-keybindLabel.BackgroundTransparency = 1
-keybindLabel.Text = "Show/Hide Panel Keybind:"
-keybindLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-keybindLabel.Font = Enum.Font.Gotham
-keybindLabel.TextSize = 12
-keybindLabel.TextXAlignment = Enum.TextXAlignment.Left
-keybindLabel.Parent = settingsFrame
+local kbSectionLbl = Instance.new("TextLabel")
+kbSectionLbl.Size               = UDim2.new(1, -20, 0, 14)
+kbSectionLbl.Position           = UDim2.new(0, 10, 0, 46)
+kbSectionLbl.BackgroundTransparency = 1
+kbSectionLbl.Text               = "  SHOW / HIDE KEYBIND"
+kbSectionLbl.TextColor3         = Color3.fromRGB(100, 50, 180)
+kbSectionLbl.Font               = Enum.Font.GothamSemibold
+kbSectionLbl.TextSize           = 8
+kbSectionLbl.TextXAlignment     = Enum.TextXAlignment.Left
+kbSectionLbl.ZIndex             = 2
+kbSectionLbl.Parent             = settingsFrame
 
 local keybindBtn = Instance.new("TextButton")
-keybindBtn.Size = UDim2.new(1, -20, 0, 32)
-keybindBtn.Position = UDim2.new(0, 10, 0, 65)
-keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-keybindBtn.Text = tostring(toggleKeybind):gsub("Enum.KeyCode.", "")
-keybindBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-keybindBtn.Font = Enum.Font.GothamBold
-keybindBtn.TextSize = 13
-keybindBtn.Parent = settingsFrame
-
-local keybindBtnCorner = Instance.new("UICorner")
-keybindBtnCorner.CornerRadius = UDim.new(0, 6)
-keybindBtnCorner.Parent = keybindBtn
-
-local keybindStroke = Instance.new("UIStroke")
-keybindStroke.Color = Color3.fromRGB(70, 70, 70)
-keybindStroke.Thickness = 1
-keybindStroke.Parent = keybindBtn
+keybindBtn.Size             = UDim2.new(1, -20, 0, 28)
+keybindBtn.Position         = UDim2.new(0, 10, 0, 62)
+keybindBtn.BackgroundColor3 = BASE_BTN
+keybindBtn.Text             = tostring(toggleKeybind):gsub("Enum.KeyCode.", "")
+keybindBtn.TextColor3       = Color3.fromRGB(160, 80, 255)
+keybindBtn.Font             = Enum.Font.GothamBold
+keybindBtn.TextSize         = 10
+keybindBtn.AutoButtonColor  = false
+keybindBtn.BorderSizePixel  = 0
+keybindBtn.ZIndex           = 2
+keybindBtn.Parent           = settingsFrame
+corner(keybindBtn, 7)
+outline(keybindBtn, LGREY, 1)
+hoverTween(keybindBtn, HOVR_BTN, BASE_BTN)
 
 local keybindHint = Instance.new("TextLabel")
-keybindHint.Size = UDim2.new(1, -20, 0, 20)
-keybindHint.Position = UDim2.new(0, 10, 0, 103)
+keybindHint.Size               = UDim2.new(1, -20, 0, 14)
+keybindHint.Position           = UDim2.new(0, 10, 0, 96)
 keybindHint.BackgroundTransparency = 1
-keybindHint.Text = "Click the button above to rebind"
-keybindHint.TextColor3 = Color3.fromRGB(120, 120, 120)
-keybindHint.Font = Enum.Font.Gotham
-keybindHint.TextSize = 11
-keybindHint.TextXAlignment = Enum.TextXAlignment.Left
-keybindHint.Parent = settingsFrame
+keybindHint.Text               = "Click above to rebind"
+keybindHint.TextColor3         = TXLO
+keybindHint.Font               = Enum.Font.Gotham
+keybindHint.TextSize           = 9
+keybindHint.TextXAlignment     = Enum.TextXAlignment.Left
+keybindHint.ZIndex             = 2
+keybindHint.Parent             = settingsFrame
+
+-- ==========================================
+-- WAVE RENDER LOOP
+-- ==========================================
+RunService.RenderStepped:Connect(function()
+    local shift = (os.clock() * 0.22) % 1
+    local seq   = getWaveSequence(shift)
+    waveGrad.Color  = seq
+    sWaveGrad.Color = seq
+end)
 
 -- ==========================================
 -- SETTINGS LOGIC
@@ -275,27 +579,24 @@ end)
 settingsCloseBtn.MouseButton1Click:Connect(function()
     settingsFrame.Visible = false
     if isListeningForKey then
-        isListeningForKey = false
-        keybindBtn.Text = tostring(toggleKeybind):gsub("Enum.KeyCode.", "")
-        keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        keybindStroke.Color = Color3.fromRGB(70, 70, 70)
-        keybindHint.Text = "Click the button above to rebind"
+        isListeningForKey     = false
+        keybindBtn.Text       = tostring(toggleKeybind):gsub("Enum.KeyCode.", "")
+        keybindBtn.TextColor3 = Color3.fromRGB(160, 80, 255)
+        keybindHint.Text      = "Click above to rebind"
     end
 end)
 
 keybindBtn.MouseButton1Click:Connect(function()
     if isListeningForKey then
-        isListeningForKey = false
-        keybindBtn.Text = tostring(toggleKeybind):gsub("Enum.KeyCode.", "")
-        keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        keybindStroke.Color = Color3.fromRGB(70, 70, 70)
-        keybindHint.Text = "Click the button above to rebind"
+        isListeningForKey     = false
+        keybindBtn.Text       = tostring(toggleKeybind):gsub("Enum.KeyCode.", "")
+        keybindBtn.TextColor3 = Color3.fromRGB(160, 80, 255)
+        keybindHint.Text      = "Click above to rebind"
     else
-        isListeningForKey = true
-        keybindBtn.Text = "Press any key..."
-        keybindBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 180)
-        keybindStroke.Color = Color3.fromRGB(50, 130, 255)
-        keybindHint.Text = "Listening... click button to cancel"
+        isListeningForKey     = true
+        keybindBtn.Text       = "[ press key... ]"
+        keybindBtn.TextColor3 = TXLO
+        keybindHint.Text      = "Listening... click to cancel"
     end
 end)
 
@@ -304,28 +605,22 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         controlFrame.Visible = not controlFrame.Visible
         return
     end
-
     if isListeningForKey and input.UserInputType == Enum.UserInputType.Keyboard then
         local ignored = {
-            [Enum.KeyCode.LeftShift] = true, [Enum.KeyCode.RightShift] = true,
-            [Enum.KeyCode.LeftControl] = true, [Enum.KeyCode.LeftAlt] = true,
-            [Enum.KeyCode.RightAlt] = true, [Enum.KeyCode.CapsLock] = true,
-            [Enum.KeyCode.Escape] = true,
+            [Enum.KeyCode.LeftShift]=true,[Enum.KeyCode.RightShift]=true,
+            [Enum.KeyCode.LeftControl]=true,[Enum.KeyCode.LeftAlt]=true,
+            [Enum.KeyCode.RightAlt]=true,[Enum.KeyCode.CapsLock]=true,
+            [Enum.KeyCode.Escape]=true,
         }
         if ignored[input.KeyCode] then return end
-
-        toggleKeybind = input.KeyCode
-        isListeningForKey = false
-
-        local keyName = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
-        keybindBtn.Text = keyName
-        keybindBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-        keybindStroke.Color = Color3.fromRGB(70, 70, 70)
-        keybindHint.Text = "Keybind saved!"
-
+        toggleKeybind         = input.KeyCode
+        isListeningForKey     = false
+        keybindBtn.Text       = tostring(input.KeyCode):gsub("Enum.KeyCode.", "")
+        keybindBtn.TextColor3 = Color3.fromRGB(160, 80, 255)
+        keybindHint.Text      = "Keybind saved!"
         task.delay(2, function()
             if keybindHint and keybindHint.Parent then
-                keybindHint.Text = "Click the button above to rebind"
+                keybindHint.Text = "Click above to rebind"
             end
         end)
     end
@@ -339,47 +634,47 @@ hideBtn.MouseButton1Click:Connect(function()
 end)
 
 LocalPlayer.Chatted:Connect(function(message)
-    if string.lower(message) == "/ap" then
-        controlFrame.Visible = true
-    end
+    if string.lower(message) == "/ap" then controlFrame.Visible = true end
 end)
 
 toggleBtn.MouseButton1Click:Connect(function()
     scriptEnabled = not scriptEnabled
     if scriptEnabled then
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 130, 255)
-        toggleBtn.Text = "Script: ON"
+        toggleBtn.TextColor3 = GREEN
+        toggleBtn.Text       = "▶  Script: ON"
+        local s = toggleBtn:FindFirstChildOfClass("UIStroke")
+        if s then s.Color = PURPLE2 end
+        TweenService:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = GREEN}):Play()
+        statusText.Text       = "Script Active"
+        statusText.TextColor3 = GREEN
     else
-        toggleBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-        toggleBtn.Text = "Script: OFF"
+        toggleBtn.TextColor3 = RED
+        toggleBtn.Text       = "⏹  Script: OFF"
+        local s = toggleBtn:FindFirstChildOfClass("UIStroke")
+        if s then s.Color = LGREY end
+        TweenService:Create(statusDot, TweenInfo.new(0.2), {BackgroundColor3 = RED}):Play()
+        statusText.Text       = "Script Inactive"
+        statusText.TextColor3 = TXLO
     end
     for _, overlay in pairs(hookedButtons) do
-        if overlay and overlay.Parent then
-            overlay.Visible = scriptEnabled
-        end
+        if overlay and overlay.Parent then overlay.Visible = scriptEnabled end
     end
 end)
 
 balanceInput.FocusLost:Connect(function()
     local num = tonumber(balanceInput.Text)
-    if num then
-        currentBalance = num
-    else
-        balanceInput.Text = tostring(currentBalance)
-    end
+    if num then currentBalance = num
+    else balanceInput.Text = tostring(currentBalance) end
 end)
 
 giftInput.FocusLost:Connect(function()
     local name = giftInput.Text
-    if name and name ~= "" then
-        giftTarget = name
-    else
-        giftInput.Text = giftTarget
-    end
+    if name and name ~= "" then giftTarget = name
+    else giftInput.Text = giftTarget end
 end)
 
 -- ==========================================
--- FUNCTION TO CREATE AND SHOW YOUR CUSTOM UI
+-- PURCHASE UI POPUP
 -- ==========================================
 local function triggerCustomStartUI(targetUser)
     if targetParent:FindFirstChild("CustomPurchaseUI") then
@@ -387,358 +682,315 @@ local function triggerCustomStartUI(targetUser)
     end
 
     local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "CustomPurchaseUI"
-    screenGui.ResetOnSpawn = false
+    screenGui.Name           = "CustomPurchaseUI"
+    screenGui.ResetOnSpawn   = false
     screenGui.IgnoreGuiInset = true
-    screenGui.Parent = targetParent
+    screenGui.Parent         = targetParent
 
     local overlay = Instance.new("TextButton")
-    overlay.Size = UDim2.new(1, 0, 1, 0)
-    overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    overlay.Size                   = UDim2.new(1, 0, 1, 0)
+    overlay.BackgroundColor3       = Color3.fromRGB(0, 0, 0)
     overlay.BackgroundTransparency = 0.5
-    overlay.Text = ""
-    overlay.AutoButtonColor = false
-    overlay.ZIndex = 1
-    overlay.Parent = screenGui
+    overlay.Text                   = ""
+    overlay.AutoButtonColor        = false
+    overlay.ZIndex                 = 1
+    overlay.Parent                 = screenGui
 
-    -- Main frame — RGB(35,35,35), no outline
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size = UDim2.new(0, 0, 0, 0)
-    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    mainFrame.Size             = UDim2.new(0, 420, 0, 210)
+    mainFrame.Position         = UDim2.new(0.5, 0, 0.5, 0)
+    mainFrame.AnchorPoint      = Vector2.new(0.5, 0.5)
     mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     mainFrame.ClipsDescendants = true
-    mainFrame.ZIndex = 2
-    mainFrame.Parent = screenGui
-
+    mainFrame.ZIndex           = 2
+    mainFrame.Parent           = screenGui
     local mainCorner = Instance.new("UICorner")
     mainCorner.CornerRadius = UDim.new(0, 12)
     mainCorner.Parent = mainFrame
 
     local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(0, 150, 0, 20)
-    titleLabel.Position = UDim2.new(0, 20, 0, 15)
+    titleLabel.Size             = UDim2.new(0, 150, 0, 20)
+    titleLabel.Position         = UDim2.new(0, 20, 0, 15)
     titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = "Buy item"
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 16
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-    titleLabel.ZIndex = 2
-    titleLabel.Parent = mainFrame
+    titleLabel.Text             = "Buy item"
+    titleLabel.TextColor3       = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize         = 16
+    titleLabel.Font             = Enum.Font.GothamBold
+    titleLabel.TextXAlignment   = Enum.TextXAlignment.Left
+    titleLabel.ZIndex           = 2
+    titleLabel.Parent           = mainFrame
 
     local mainCloseButton = Instance.new("TextButton")
-    mainCloseButton.Size = UDim2.new(0, 20, 0, 20)
-    mainCloseButton.Position = UDim2.new(1, -30, 0, 15)
+    mainCloseButton.Size             = UDim2.new(0, 20, 0, 20)
+    mainCloseButton.Position         = UDim2.new(1, -30, 0, 15)
     mainCloseButton.BackgroundTransparency = 1
-    mainCloseButton.Text = "X"
-    mainCloseButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-    mainCloseButton.TextSize = 16
-    mainCloseButton.Font = Enum.Font.GothamBold
-    mainCloseButton.ZIndex = 2
-    mainCloseButton.Parent = mainFrame
+    mainCloseButton.Text             = "X"
+    mainCloseButton.TextColor3       = Color3.fromRGB(200, 200, 200)
+    mainCloseButton.TextSize         = 16
+    mainCloseButton.Font             = Enum.Font.GothamBold
+    mainCloseButton.ZIndex           = 2
+    mainCloseButton.Parent           = mainFrame
 
-    -- Balance display
     local balanceContainer = Instance.new("Frame")
     balanceContainer.BackgroundTransparency = 1
-    balanceContainer.Size = UDim2.new(0, 200, 0, 20)
-    balanceContainer.Position = UDim2.new(1, -35, 0, 15)
+    balanceContainer.Size      = UDim2.new(0, 200, 0, 20)
+    balanceContainer.Position  = UDim2.new(1, -35, 0, 15)
     balanceContainer.AnchorPoint = Vector2.new(1, 0)
-    balanceContainer.ZIndex = 2
-    balanceContainer.Parent = mainFrame
+    balanceContainer.ZIndex    = 2
+    balanceContainer.Parent    = mainFrame
 
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.FillDirection = Enum.FillDirection.Horizontal
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, 4)
-    listLayout.Parent = balanceContainer
+    local listLayout2 = Instance.new("UIListLayout")
+    listLayout2.FillDirection       = Enum.FillDirection.Horizontal
+    listLayout2.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    listLayout2.VerticalAlignment   = Enum.VerticalAlignment.Center
+    listLayout2.SortOrder           = Enum.SortOrder.LayoutOrder
+    listLayout2.Padding             = UDim.new(0, 4)
+    listLayout2.Parent              = balanceContainer
 
     local balanceIcon = Instance.new("ImageLabel")
-    balanceIcon.Size = UDim2.new(0, 14, 0, 14)
+    balanceIcon.Size                = UDim2.new(0, 14, 0, 14)
     balanceIcon.BackgroundTransparency = 1
-    balanceIcon.Image = ROBUX_ICON_ID
-    balanceIcon.ImageColor3 = Color3.fromRGB(200, 200, 200)
-    balanceIcon.LayoutOrder = 1
-    balanceIcon.ZIndex = 2
-    balanceIcon.Parent = balanceContainer
+    balanceIcon.Image               = ROBUX_ICON_ID
+    balanceIcon.ImageColor3         = Color3.fromRGB(200, 200, 200)
+    balanceIcon.LayoutOrder         = 1
+    balanceIcon.ZIndex              = 2
+    balanceIcon.Parent              = balanceContainer
 
     local balanceTextLabel = Instance.new("TextLabel")
-    balanceTextLabel.Size = UDim2.new(0, 0, 1, 0)
-    balanceTextLabel.AutomaticSize = Enum.AutomaticSize.X
+    balanceTextLabel.Size              = UDim2.new(0, 0, 1, 0)
+    balanceTextLabel.AutomaticSize     = Enum.AutomaticSize.X
     balanceTextLabel.BackgroundTransparency = 1
-    balanceTextLabel.Text = FormatNumber(currentBalance)
-    balanceTextLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    balanceTextLabel.TextSize = 14
-    balanceTextLabel.Font = Enum.Font.Gotham
-    balanceTextLabel.LayoutOrder = 2
-    balanceTextLabel.ZIndex = 2
-    balanceTextLabel.Parent = balanceContainer
+    balanceTextLabel.Text              = FormatNumber(currentBalance)
+    balanceTextLabel.TextColor3        = Color3.fromRGB(200, 200, 200)
+    balanceTextLabel.TextSize          = 14
+    balanceTextLabel.Font              = Enum.Font.Gotham
+    balanceTextLabel.LayoutOrder       = 2
+    balanceTextLabel.ZIndex            = 2
+    balanceTextLabel.Parent            = balanceContainer
 
-    -- Item icon & labels
     local itemIcon = Instance.new("ImageLabel")
-    itemIcon.Size = UDim2.new(0, 60, 0, 60)
-    itemIcon.Position = UDim2.new(0, 20, 0, 55)
+    itemIcon.Size                = UDim2.new(0, 60, 0, 60)
+    itemIcon.Position            = UDim2.new(0, 20, 0, 55)
     itemIcon.BackgroundTransparency = 1
-    itemIcon.Image = ITEM_IMAGE_ID
-    itemIcon.ScaleType = Enum.ScaleType.Fit
-    itemIcon.ZIndex = 2
-    itemIcon.Parent = mainFrame
+    itemIcon.Image               = ITEM_IMAGE_ID
+    itemIcon.ScaleType           = Enum.ScaleType.Fit
+    itemIcon.ZIndex              = 2
+    itemIcon.Parent              = mainFrame
 
     local itemLabel = Instance.new("TextLabel")
-    itemLabel.Size = UDim2.new(1, -110, 0, 20)
-    itemLabel.Position = UDim2.new(0, 95, 0, 60)
+    itemLabel.Size             = UDim2.new(1, -110, 0, 20)
+    itemLabel.Position         = UDim2.new(0, 95, 0, 60)
     itemLabel.BackgroundTransparency = 1
-    itemLabel.Text = "[GIFT] Admin Commands"
-    itemLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    itemLabel.TextSize = 16
-    itemLabel.Font = Enum.Font.GothamBold
-    itemLabel.TextXAlignment = Enum.TextXAlignment.Left
-    itemLabel.ZIndex = 2
-    itemLabel.Parent = mainFrame
+    itemLabel.Text             = "[GIFT] Admin Commands"
+    itemLabel.TextColor3       = Color3.fromRGB(255, 255, 255)
+    itemLabel.TextSize         = 16
+    itemLabel.Font             = Enum.Font.GothamBold
+    itemLabel.TextXAlignment   = Enum.TextXAlignment.Left
+    itemLabel.ZIndex           = 2
+    itemLabel.Parent           = mainFrame
 
     local priceIcon = Instance.new("ImageLabel")
-    priceIcon.Size = UDim2.new(0, 14, 0, 14)
-    priceIcon.Position = UDim2.new(0, 95, 0, 88)
+    priceIcon.Size                = UDim2.new(0, 14, 0, 14)
+    priceIcon.Position            = UDim2.new(0, 95, 0, 88)
     priceIcon.BackgroundTransparency = 1
-    priceIcon.Image = ROBUX_ICON_ID
-    priceIcon.ZIndex = 2
-    priceIcon.Parent = mainFrame
+    priceIcon.Image               = ROBUX_ICON_ID
+    priceIcon.ZIndex              = 2
+    priceIcon.Parent              = mainFrame
 
     local priceText = Instance.new("TextLabel")
-    priceText.Size = UDim2.new(0, 100, 0, 20)
-    priceText.Position = UDim2.new(0, 115, 0, 85)
+    priceText.Size             = UDim2.new(0, 100, 0, 20)
+    priceText.Position         = UDim2.new(0, 115, 0, 85)
     priceText.BackgroundTransparency = 1
-    priceText.Text = "7,499"
-    priceText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    priceText.TextSize = 14
-    priceText.Font = Enum.Font.Gotham
-    priceText.TextXAlignment = Enum.TextXAlignment.Left
-    priceText.ZIndex = 2
-    priceText.Parent = mainFrame
+    priceText.Text             = "7,499"
+    priceText.TextColor3       = Color3.fromRGB(255, 255, 255)
+    priceText.TextSize         = 14
+    priceText.Font             = Enum.Font.Gotham
+    priceText.TextXAlignment   = Enum.TextXAlignment.Left
+    priceText.ZIndex           = 2
+    priceText.Parent           = mainFrame
 
-    -- Buy button: dark navy base, vivid blue fill (image 2 style)
     local startButton = Instance.new("TextButton")
-    startButton.Size = UDim2.new(1, -40, 0, 45)
-    startButton.Position = UDim2.new(0, 20, 0, 140)
+    startButton.Size             = UDim2.new(1, -40, 0, 45)
+    startButton.Position         = UDim2.new(0, 20, 0, 140)
     startButton.BackgroundColor3 = Color3.fromRGB(30, 45, 100)
-    startButton.Text = ""
-    startButton.ZIndex = 2
-    startButton.Parent = mainFrame
-
+    startButton.Text             = ""
+    startButton.ZIndex           = 2
+    startButton.Parent           = mainFrame
     local buttonCorner = Instance.new("UICorner")
     buttonCorner.CornerRadius = UDim.new(0, 8)
     buttonCorner.Parent = startButton
 
     local loadingFill = Instance.new("Frame")
-    loadingFill.Size = UDim2.new(0, 0, 1, 0)
+    loadingFill.Size             = UDim2.new(0, 0, 1, 0)
     loadingFill.BackgroundColor3 = Color3.fromRGB(50, 130, 255)
-    loadingFill.BorderSizePixel = 0
-    loadingFill.ZIndex = 2
-    loadingFill.Parent = startButton
-
+    loadingFill.BorderSizePixel  = 0
+    loadingFill.ZIndex           = 2
+    loadingFill.Parent           = startButton
     local fillCorner = Instance.new("UICorner")
     fillCorner.CornerRadius = UDim.new(0, 8)
     fillCorner.Parent = loadingFill
 
     local startText = Instance.new("TextLabel")
-    startText.Size = UDim2.new(1, 0, 1, 0)
+    startText.Size               = UDim2.new(1, 0, 1, 0)
     startText.BackgroundTransparency = 1
-    startText.Text = "Buy"
-    startText.TextColor3 = Color3.fromRGB(180, 180, 180)
-    startText.TextSize = 18
-    startText.Font = Enum.Font.GothamBold
-    startText.ZIndex = 3
-    startText.Parent = startButton
+    startText.Text               = "Buy"
+    startText.TextColor3         = Color3.fromRGB(180, 180, 180)
+    startText.TextSize           = 18
+    startText.Font               = Enum.Font.GothamBold
+    startText.ZIndex             = 3
+    startText.Parent             = startButton
 
-    -- Success frame — RGB(35,35,35), no outline
     local successFrame = Instance.new("Frame")
-    successFrame.Size = UDim2.new(0, 0, 0, 0)
-    successFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    successFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    successFrame.Size             = UDim2.new(0, 0, 0, 0)
+    successFrame.Position         = UDim2.new(0.5, 0, 0.5, 0)
+    successFrame.AnchorPoint      = Vector2.new(0.5, 0.5)
     successFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     successFrame.ClipsDescendants = true
-    successFrame.Visible = false
-    successFrame.ZIndex = 2
-    successFrame.Parent = screenGui
-
+    successFrame.Visible          = false
+    successFrame.ZIndex           = 2
+    successFrame.Parent           = screenGui
     local successCorner = Instance.new("UICorner")
     successCorner.CornerRadius = UDim.new(0, 12)
     successCorner.Parent = successFrame
 
     local successTitle = Instance.new("TextLabel")
-    successTitle.Size = UDim2.new(1, -40, 0, 40)
-    successTitle.Position = UDim2.new(0, 20, 0, 5)
+    successTitle.Size             = UDim2.new(1, -40, 0, 40)
+    successTitle.Position         = UDim2.new(0, 20, 0, 5)
     successTitle.BackgroundTransparency = 1
-    successTitle.Text = "Purchase completed"
-    successTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    successTitle.TextSize = 16
-    successTitle.Font = Enum.Font.GothamBold
-    successTitle.TextXAlignment = Enum.TextXAlignment.Left
-    successTitle.ZIndex = 2
-    successTitle.Parent = successFrame
+    successTitle.Text             = "Purchase completed"
+    successTitle.TextColor3       = Color3.fromRGB(255, 255, 255)
+    successTitle.TextSize         = 16
+    successTitle.Font             = Enum.Font.GothamBold
+    successTitle.TextXAlignment   = Enum.TextXAlignment.Left
+    successTitle.ZIndex           = 2
+    successTitle.Parent           = successFrame
 
     local successCloseButton = Instance.new("TextButton")
-    successCloseButton.Size = UDim2.new(0, 30, 0, 30)
-    successCloseButton.Position = UDim2.new(1, -40, 0, 10)
+    successCloseButton.Size             = UDim2.new(0, 30, 0, 30)
+    successCloseButton.Position         = UDim2.new(1, -40, 0, 10)
     successCloseButton.BackgroundTransparency = 1
-    successCloseButton.Text = "X"
-    successCloseButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-    successCloseButton.TextSize = 16
-    successCloseButton.Font = Enum.Font.GothamBold
-    successCloseButton.ZIndex = 2
-    successCloseButton.Parent = successFrame
+    successCloseButton.Text             = "X"
+    successCloseButton.TextColor3       = Color3.fromRGB(200, 200, 200)
+    successCloseButton.TextSize         = 16
+    successCloseButton.Font             = Enum.Font.GothamBold
+    successCloseButton.ZIndex           = 2
+    successCloseButton.Parent           = successFrame
 
     local checkCircle = Instance.new("Frame")
-    checkCircle.Size = UDim2.new(0, 50, 0, 50)
-    checkCircle.Position = UDim2.new(0.5, -25, 0, 45)
+    checkCircle.Size             = UDim2.new(0, 50, 0, 50)
+    checkCircle.Position         = UDim2.new(0.5, -25, 0, 45)
     checkCircle.BackgroundTransparency = 1
-    checkCircle.ZIndex = 2
-    checkCircle.Parent = successFrame
-
+    checkCircle.ZIndex           = 2
+    checkCircle.Parent           = successFrame
     local circleCorner = Instance.new("UICorner")
     circleCorner.CornerRadius = UDim.new(0.5, 0)
     circleCorner.Parent = checkCircle
-
     local circleStroke = Instance.new("UIStroke")
-    circleStroke.Color = Color3.fromRGB(255, 255, 255)
-    circleStroke.Thickness = 2
+    circleStroke.Color = Color3.fromRGB(255,255,255); circleStroke.Thickness = 2
     circleStroke.Parent = checkCircle
 
     local checkMark = Instance.new("TextLabel")
-    checkMark.Size = UDim2.new(1, 0, 1, 0)
+    checkMark.Size               = UDim2.new(1, 0, 1, 0)
     checkMark.BackgroundTransparency = 1
-    checkMark.Text = "✓"
-    checkMark.TextColor3 = Color3.fromRGB(255, 255, 255)
-    checkMark.TextSize = 30
-    checkMark.Font = Enum.Font.GothamBold
-    checkMark.ZIndex = 2
-    checkMark.Parent = checkCircle
+    checkMark.Text               = "✓"
+    checkMark.TextColor3         = Color3.fromRGB(255, 255, 255)
+    checkMark.TextSize           = 30
+    checkMark.Font               = Enum.Font.GothamBold
+    checkMark.ZIndex             = 2
+    checkMark.Parent             = checkCircle
 
     local successDesc = Instance.new("TextLabel")
-    successDesc.Size = UDim2.new(1, -40, 0, 20)
-    successDesc.Position = UDim2.new(0, 20, 0, 110)
+    successDesc.Size             = UDim2.new(1, -40, 0, 20)
+    successDesc.Position         = UDim2.new(0, 20, 0, 110)
     successDesc.BackgroundTransparency = 1
-    successDesc.Text = "You have successfully bought [GIFT] Admin Commands."
-    successDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
-    successDesc.TextSize = 14
-    successDesc.Font = Enum.Font.Gotham
-    successDesc.ZIndex = 2
-    successDesc.Parent = successFrame
+    successDesc.Text             = "You have successfully bought [GIFT] Admin Commands."
+    successDesc.TextColor3       = Color3.fromRGB(200, 200, 200)
+    successDesc.TextSize         = 14
+    successDesc.Font             = Enum.Font.Gotham
+    successDesc.ZIndex           = 2
+    successDesc.Parent           = successFrame
 
     local okButton = Instance.new("TextButton")
-    okButton.Size = UDim2.new(1, -40, 0, 40)
-    okButton.Position = UDim2.new(0, 20, 0, 140)
+    okButton.Size             = UDim2.new(1, -40, 0, 40)
+    okButton.Position         = UDim2.new(0, 20, 0, 140)
     okButton.BackgroundColor3 = Color3.fromRGB(50, 130, 255)
-    okButton.Text = "OK"
-    okButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    okButton.TextSize = 16
-    okButton.Font = Enum.Font.GothamBold
-    okButton.ZIndex = 2
-    okButton.Parent = successFrame
-
+    okButton.Text             = "OK"
+    okButton.TextColor3       = Color3.fromRGB(255, 255, 255)
+    okButton.TextSize         = 16
+    okButton.Font             = Enum.Font.GothamBold
+    okButton.ZIndex           = 2
+    okButton.Parent           = successFrame
     local okCorner = Instance.new("UICorner")
     okCorner.CornerRadius = UDim.new(0, 8)
     okCorner.Parent = okButton
 
     local bottomNotification = Instance.new("TextLabel")
-    bottomNotification.Size = UDim2.new(0, 0, 0, 0)
-    bottomNotification.Position = UDim2.new(0.5, 0, 0.85, 0)
-    bottomNotification.AnchorPoint = Vector2.new(0.5, 0.5)
+    bottomNotification.Size             = UDim2.new(1, 0, 0, 50)
+    bottomNotification.Position         = UDim2.new(0.5, 0, 0.85, 0)
+    bottomNotification.AnchorPoint      = Vector2.new(0.5, 0.5)
     bottomNotification.BackgroundTransparency = 1
-    bottomNotification.Text = "You gifted Admin Commands to " .. targetUser .. "!"
-    bottomNotification.TextColor3 = Color3.fromRGB(150, 255, 120)
-    bottomNotification.TextSize = 24
-    bottomNotification.Font = Enum.Font.GothamBlack
-    bottomNotification.Visible = false
-    bottomNotification.ZIndex = 0
-    bottomNotification.Parent = screenGui
-
+    bottomNotification.Text             = "You gifted Admin Commands to " .. targetUser .. "!"
+    bottomNotification.TextColor3       = Color3.fromRGB(150, 255, 120)
+    bottomNotification.TextSize         = 24
+    bottomNotification.Font             = Enum.Font.GothamBlack
+    bottomNotification.Visible          = false
+    bottomNotification.ZIndex           = 0
+    bottomNotification.Parent           = screenGui
     local textStroke = Instance.new("UIStroke")
-    textStroke.Color = Color3.fromRGB(0, 0, 0)
-    textStroke.Thickness = 2.5
+    textStroke.Color = Color3.fromRGB(0,0,0); textStroke.Thickness = 2.5
     textStroke.Parent = bottomNotification
 
-    -- ==========================================
-    -- ANIMATIONS & LOGIC
-    -- ==========================================
-    local isClickable = false
-    local popTweenInfo = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    local isSuccessClosed = false
-    local isNotificationFaded = false
+    -- Logic
+    local isClickable        = false
+    local isSuccessClosed    = false
+    local isNotificationFaded= false
 
     local function checkCleanup()
-        if isSuccessClosed and isNotificationFaded then
-            screenGui:Destroy()
-        end
+        if isSuccessClosed and isNotificationFaded then screenGui:Destroy() end
     end
 
-    local mainPopTween = TweenService:Create(mainFrame, popTweenInfo, {Size = UDim2.new(0, 420, 0, 210)})
-    mainPopTween:Play()
-
     local fillTweenInfo = TweenInfo.new(2, Enum.EasingStyle.Linear)
-    local loadTween = TweenService:Create(loadingFill, fillTweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
-
+    local loadTween     = TweenService:Create(loadingFill, fillTweenInfo, {Size = UDim2.new(1, 0, 1, 0)})
     loadTween.Completed:Connect(function()
-        isClickable = true
+        isClickable          = true
         startText.TextColor3 = Color3.fromRGB(255, 255, 255)
     end)
-
     task.wait(0.5)
     loadTween:Play()
 
     startButton.MouseButton1Click:Connect(function()
         if not isClickable then return end
         isClickable = false
-
-        loadingFill.Visible = false
-        startText.TextColor3 = Color3.fromRGB(255, 255, 255)
-
+        loadingFill.Visible       = false
+        startText.TextColor3      = Color3.fromRGB(255, 255, 255)
         task.wait(0.75)
-
-        currentBalance = currentBalance - 7499
-        balanceInput.Text = tostring(currentBalance)
-
-        mainFrame.Visible = false
-
-        successFrame.Visible = true
-        bottomNotification.Visible = true
-
-        local successPopTween = TweenService:Create(successFrame, popTweenInfo, {Size = UDim2.new(0, 400, 0, 200)})
-        successPopTween:Play()
-
-        local textPopTween = TweenService:Create(bottomNotification, popTweenInfo, {Size = UDim2.new(1, 0, 0, 50)})
-        textPopTween:Play()
-
+        currentBalance            = currentBalance - 7499
+        balanceInput.Text         = tostring(currentBalance)
+        mainFrame.Visible         = false
+        successFrame.Visible      = true
+        successFrame.Size         = UDim2.new(0, 400, 0, 200)
+        bottomNotification.Visible= true
         print("Executing Admin Commands...")
-
         task.spawn(function()
             task.wait(3)
             local fadeOutInfo = TweenInfo.new(1, Enum.EasingStyle.Linear)
-            local fadeText = TweenService:Create(bottomNotification, fadeOutInfo, {TextTransparency = 1})
-            local fadeStroke = TweenService:Create(textStroke, fadeOutInfo, {Transparency = 1})
-
-            fadeText:Play()
-            fadeStroke:Play()
+            local fadeText    = TweenService:Create(bottomNotification, fadeOutInfo, {TextTransparency = 1})
+            local fadeStroke  = TweenService:Create(textStroke, fadeOutInfo, {Transparency = 1})
+            fadeText:Play(); fadeStroke:Play()
             fadeText.Completed:Wait()
-
             isNotificationFaded = true
             checkCleanup()
         end)
     end)
 
-    mainCloseButton.MouseButton1Click:Connect(function()
-        screenGui:Destroy()
-    end)
+    mainCloseButton.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
     local function closeSuccessFrame()
         successFrame.Visible = false
-        overlay.Visible = false
-        isSuccessClosed = true
+        overlay.Visible      = false
+        isSuccessClosed      = true
         checkCleanup()
     end
-
     successCloseButton.MouseButton1Click:Connect(closeSuccessFrame)
     okButton.MouseButton1Click:Connect(closeSuccessFrame)
 end
@@ -749,35 +1001,29 @@ end
 local function attemptToHookButton(guiElement)
     if guiElement:IsA("GuiButton") then
         if guiElement:FindFirstChild("PurchaseBlockOverlay") then return end
-
         local foundText = false
-
-        if guiElement:IsA("TextButton") and (string.find(guiElement.Text, "7,499") or string.find(guiElement.Text, "7499")) then
+        if guiElement:IsA("TextButton") and
+           (string.find(guiElement.Text, "7,499") or string.find(guiElement.Text, "7499")) then
             foundText = true
         end
-
         for _, child in pairs(guiElement:GetDescendants()) do
-            if child:IsA("TextLabel") and (string.find(child.Text, "7,499") or string.find(child.Text, "7499")) then
+            if child:IsA("TextLabel") and
+               (string.find(child.Text, "7,499") or string.find(child.Text, "7499")) then
                 foundText = true
             end
         end
-
         if foundText then
             local blockOverlay = Instance.new("TextButton")
-            blockOverlay.Name = "PurchaseBlockOverlay"
-            blockOverlay.Size = UDim2.new(1, 0, 1, 0)
-            blockOverlay.BackgroundTransparency = 1
-            blockOverlay.Text = ""
-            blockOverlay.ZIndex = guiElement.ZIndex + 10
-            blockOverlay.Visible = scriptEnabled
-            blockOverlay.Parent = guiElement
-
+            blockOverlay.Name                  = "PurchaseBlockOverlay"
+            blockOverlay.Size                  = UDim2.new(1, 0, 1, 0)
+            blockOverlay.BackgroundTransparency= 1
+            blockOverlay.Text                  = ""
+            blockOverlay.ZIndex                = guiElement.ZIndex + 10
+            blockOverlay.Visible               = scriptEnabled
+            blockOverlay.Parent                = guiElement
             blockOverlay.MouseButton1Click:Connect(function()
-                if scriptEnabled then
-                    triggerCustomStartUI(giftTarget)
-                end
+                if scriptEnabled then triggerCustomStartUI(giftTarget) end
             end)
-
             table.insert(hookedButtons, blockOverlay)
             print("Successfully hooked and blocked the Admin Commands purchase button!")
         end
@@ -787,5 +1033,4 @@ end
 for _, element in pairs(LocalPlayer:WaitForChild("PlayerGui"):GetDescendants()) do
     attemptToHookButton(element)
 end
-
 LocalPlayer.PlayerGui.DescendantAdded:Connect(attemptToHookButton)
