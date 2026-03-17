@@ -1,0 +1,765 @@
+-- Orbit's OG Visual
+
+local RunService       = game:GetService("RunService")
+local Players          = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+
+local selectedRarities = {
+    ["Common"]    = true,
+    ["Rare"]      = true,
+    ["Epic"]      = true,
+    ["Legendary"] = true,
+    ["Mythic"]    = true,
+    ["Secret"]    = true,
+}
+
+local activeGradients   = {}
+local secretGradients   = {}
+local originalStates    = {}
+local isMasterEnabled   = false
+local useMinimizeSquare = true
+
+local uiKeybind     = Enum.KeyCode.LeftControl
+local masterKeybind = Enum.KeyCode.RightControl
+local isBinding     = false
+local bindingTarget = nil
+local bindingBtn    = nil
+
+-- shimmer colours
+local richGold    = Color3.fromRGB(255, 215,   0)
+local darkGold    = Color3.fromRGB(130, 100,   0)
+local blackBand   = Color3.fromRGB( 20,  20,  20)
+local secretWhite = Color3.fromRGB(255, 255, 255)
+
+local BLACK  = Color3.fromRGB(  0,   0,   0)
+local DKGREY = Color3.fromRGB( 18,  18,  18)
+local MGREY  = Color3.fromRGB( 30,  30,  30)
+local LGREY  = Color3.fromRGB( 50,  50,  50)
+local WHITE  = Color3.fromRGB(255, 255, 255)
+local PURPLE = Color3.fromRGB(160,  80, 255)
+local PURLO  = Color3.fromRGB( 90,  40, 160)
+local GREEN  = Color3.fromRGB( 60, 210, 100)
+local RED    = Color3.fromRGB(215,  55,  70)
+local GREY   = Color3.fromRGB( 55,  55,  55)
+local TXLO   = Color3.fromRGB(120, 120, 120)
+
+-- ==========================================
+-- HELPERS
+-- ==========================================
+local function corner(p, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, r or 6)
+    c.Parent = p
+end
+
+local function outline(p, col, thick)
+    local s = Instance.new("UIStroke")
+    s.Color           = col or LGREY
+    s.Thickness       = thick or 1
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    s.Parent          = p
+    return s
+end
+
+local function listLayout(p, spacing)
+    local l = Instance.new("UIListLayout")
+    l.Padding             = UDim.new(0, spacing or 5)
+    l.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    l.SortOrder           = Enum.SortOrder.LayoutOrder
+    l.Parent              = p
+end
+
+local function pad(p, t, b, l, r)
+    local u = Instance.new("UIPadding")
+    u.PaddingTop    = UDim.new(0, t or 6)
+    u.PaddingBottom = UDim.new(0, b or 6)
+    u.PaddingLeft   = UDim.new(0, l or 6)
+    u.PaddingRight  = UDim.new(0, r or 6)
+    u.Parent = p
+end
+
+local function label(parent, txt, size, col, xalign, zidx)
+    local l = Instance.new("TextLabel")
+    l.BackgroundTransparency = 1
+    l.Text                   = txt
+    l.Font                   = Enum.Font.GothamSemibold
+    l.TextSize               = size or 11
+    l.TextColor3             = col or WHITE
+    l.TextXAlignment         = xalign or Enum.TextXAlignment.Left
+    l.ZIndex                 = zidx or 2
+    l.Parent                 = parent
+    return l
+end
+
+-- ==========================================
+-- DRAG
+-- ==========================================
+local function makeDraggable(handle, target)
+    local dragging, dragInput, dragStart, startPos
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
+            dragStart = input.Position
+            startPos  = target.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    handle.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local d = input.Position - dragStart
+            target.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + d.X,
+                startPos.Y.Scale, startPos.Y.Offset + d.Y
+            )
+        end
+    end)
+end
+
+local applyOG, revertSpecific
+
+-- ==========================================
+-- SCREEN GUI
+-- ==========================================
+local ok, cg = pcall(function() return game:GetService("CoreGui") end)
+local guiParent = ok and cg or Players.LocalPlayer:WaitForChild("PlayerGui")
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name           = "OrbitOGVisualUI"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent         = guiParent
+
+-- ==========================================
+-- MAIN WINDOW
+-- ==========================================
+local Main = Instance.new("Frame")
+Main.Size             = UDim2.new(0, 200, 0, 260)
+Main.Position         = UDim2.new(0.78, 0, 0.33, 0)
+Main.BackgroundColor3 = BLACK
+Main.BorderSizePixel  = 0
+Main.Parent           = ScreenGui
+corner(Main, 8)
+outline(Main, PURPLE, 1.5)
+
+-- ── Top Bar ──────────────────────────────
+local TopBar = Instance.new("Frame")
+TopBar.Size             = UDim2.new(1, 0, 0, 36)
+TopBar.BackgroundColor3 = DKGREY
+TopBar.BorderSizePixel  = 0
+TopBar.ZIndex           = 2
+TopBar.Parent           = Main
+corner(TopBar, 8)
+makeDraggable(TopBar, Main)
+
+-- hide bottom rounded corners of topbar
+local TopFix = Instance.new("Frame")
+TopFix.Size             = UDim2.new(1, 0, 0, 8)
+TopFix.Position         = UDim2.new(0, 0, 1, -8)
+TopFix.BackgroundColor3 = DKGREY
+TopFix.BorderSizePixel  = 0
+TopFix.ZIndex           = 2
+TopFix.Parent           = TopBar
+
+-- bottom border line
+local TopLine = Instance.new("Frame")
+TopLine.Size             = UDim2.new(1, 0, 0, 1)
+TopLine.Position         = UDim2.new(0, 0, 0, 36)
+TopLine.BackgroundColor3 = PURPLE
+TopLine.BorderSizePixel  = 0
+TopLine.ZIndex           = 2
+TopLine.Parent           = Main
+
+-- Title
+local TitleLbl = label(TopBar, "Orbit's OG Visual", 12, WHITE, Enum.TextXAlignment.Left, 3)
+TitleLbl.Size     = UDim2.new(1, -44, 1, 0)
+TitleLbl.Position = UDim2.new(0, 10, 0, 0)
+TitleLbl.Font     = Enum.Font.GothamBlack
+
+-- Minimize button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size             = UDim2.new(0, 22, 0, 22)
+MinBtn.Position         = UDim2.new(1, -30, 0.5, -11)
+MinBtn.BackgroundColor3 = MGREY
+MinBtn.Text             = "–"
+MinBtn.TextColor3       = WHITE
+MinBtn.Font             = Enum.Font.GothamBold
+MinBtn.TextSize         = 13
+MinBtn.AutoButtonColor  = false
+MinBtn.ZIndex           = 4
+MinBtn.Parent           = TopBar
+corner(MinBtn, 5)
+outline(MinBtn, LGREY, 1)
+
+MinBtn.MouseEnter:Connect(function()
+    TweenService:Create(MinBtn, TweenInfo.new(0.1), {BackgroundColor3 = RED}):Play()
+end)
+MinBtn.MouseLeave:Connect(function()
+    TweenService:Create(MinBtn, TweenInfo.new(0.1), {BackgroundColor3 = MGREY}):Play()
+end)
+
+-- ==========================================
+-- TAB BAR
+-- ==========================================
+local TabBar = Instance.new("Frame")
+TabBar.Size             = UDim2.new(1, -14, 0, 26)
+TabBar.Position         = UDim2.new(0, 7, 0, 43)
+TabBar.BackgroundColor3 = DKGREY
+TabBar.BorderSizePixel  = 0
+TabBar.Parent           = Main
+corner(TabBar, 6)
+outline(TabBar, LGREY, 1)
+
+do
+    local tl = Instance.new("UIListLayout")
+    tl.FillDirection     = Enum.FillDirection.Horizontal
+    tl.SortOrder         = Enum.SortOrder.LayoutOrder
+    tl.Padding           = UDim.new(0, 2)
+    tl.VerticalAlignment = Enum.VerticalAlignment.Center
+    tl.Parent            = TabBar
+    local tp = Instance.new("UIPadding")
+    tp.PaddingLeft   = UDim.new(0, 2)
+    tp.PaddingRight  = UDim.new(0, 2)
+    tp.PaddingTop    = UDim.new(0, 2)
+    tp.PaddingBottom = UDim.new(0, 2)
+    tp.Parent        = TabBar
+end
+
+local ContentArea = Instance.new("Frame")
+ContentArea.Size                   = UDim2.new(1, -12, 1, -78)
+ContentArea.Position               = UDim2.new(0, 6, 0, 75)
+ContentArea.BackgroundTransparency = 1
+ContentArea.Parent                 = Main
+
+-- ==========================================
+-- MINIMISED SQUARE
+-- ==========================================
+local MinFrame = Instance.new("TextButton")
+MinFrame.Size             = UDim2.new(0, 46, 0, 46)
+MinFrame.Position         = UDim2.new(0.78, 0, 0.33, 0)
+MinFrame.BackgroundColor3 = BLACK
+MinFrame.Text             = ""
+MinFrame.AutoButtonColor  = false
+MinFrame.Visible          = false
+MinFrame.ZIndex           = 2
+MinFrame.Parent           = ScreenGui
+corner(MinFrame, 8)
+outline(MinFrame, PURPLE, 1.5)
+makeDraggable(MinFrame, MinFrame)
+
+local MinLabel = label(MinFrame, "OG", 16, WHITE, Enum.TextXAlignment.Center, 3)
+MinLabel.Size     = UDim2.new(1, 0, 1, 0)
+MinLabel.Font     = Enum.Font.GothamBlack
+MinLabel.TextColor3 = PURPLE
+
+-- ==========================================
+-- TAB FACTORY
+-- ==========================================
+local tabs  = {}
+local pages = {}
+
+local function createTab(name, order)
+    local btn = Instance.new("TextButton")
+    btn.Size                   = UDim2.new(0.333, -2, 1, 0)
+    btn.BackgroundColor3       = MGREY
+    btn.BackgroundTransparency = 1
+    btn.BorderSizePixel        = 0
+    btn.Text                   = name
+    btn.TextColor3             = TXLO
+    btn.Font                   = Enum.Font.GothamSemibold
+    btn.TextSize               = 9
+    btn.LayoutOrder            = order
+    btn.AutoButtonColor        = false
+    btn.Parent                 = TabBar
+    corner(btn, 5)
+
+    local page = Instance.new("ScrollingFrame")
+    page.Size                   = UDim2.new(1, 0, 1, 0)
+    page.BackgroundTransparency = 1
+    page.ScrollBarThickness     = 2
+    page.ScrollBarImageColor3   = LGREY
+    page.AutomaticCanvasSize    = Enum.AutomaticSize.Y
+    page.CanvasSize             = UDim2.new(0, 0, 0, 0)
+    page.Visible                = false
+    page.BorderSizePixel        = 0
+    page.Parent                 = ContentArea
+
+    tabs[name]  = btn
+    pages[name] = page
+
+    btn.MouseButton1Click:Connect(function()
+        for n, b in pairs(tabs) do
+            b.BackgroundTransparency = 1
+            b.TextColor3             = TXLO
+            pages[n].Visible         = false
+        end
+        btn.BackgroundTransparency = 0
+        btn.BackgroundColor3       = MGREY
+        btn.TextColor3             = PURPLE
+        page.Visible               = true
+    end)
+
+    return page
+end
+
+local MainPage     = createTab("Main",     1)
+local RaritiesPage = createTab("Rarities", 2)
+local SettingsPage = createTab("Settings", 3)
+
+tabs["Main"].BackgroundTransparency = 0
+tabs["Main"].BackgroundColor3       = MGREY
+tabs["Main"].TextColor3             = PURPLE
+MainPage.Visible                    = true
+
+-- ==========================================
+-- MAIN PAGE
+-- ==========================================
+listLayout(MainPage, 6)
+pad(MainPage, 7, 7, 1, 1)
+
+-- Status row
+local StatusRow = Instance.new("Frame")
+StatusRow.Size             = UDim2.new(1, 0, 0, 40)
+StatusRow.BackgroundColor3 = DKGREY
+StatusRow.BorderSizePixel  = 0
+StatusRow.LayoutOrder      = 0
+StatusRow.Parent           = MainPage
+corner(StatusRow, 6)
+outline(StatusRow, LGREY, 1)
+
+local StatusDot = Instance.new("Frame")
+StatusDot.Size             = UDim2.new(0, 8, 0, 8)
+StatusDot.Position         = UDim2.new(0, 10, 0.5, -4)
+StatusDot.BackgroundColor3 = RED
+StatusDot.BorderSizePixel  = 0
+StatusDot.Parent           = StatusRow
+corner(StatusDot, 4)
+
+local StatusText = label(StatusRow, "Script Inactive", 11, TXLO, Enum.TextXAlignment.Left, 2)
+StatusText.Size     = UDim2.new(1, -28, 1, 0)
+StatusText.Position = UDim2.new(0, 26, 0, 0)
+
+-- Master toggle
+local MasterBtn = Instance.new("TextButton")
+MasterBtn.Size             = UDim2.new(1, 0, 0, 32)
+MasterBtn.BackgroundColor3 = DKGREY
+MasterBtn.Text             = "▶  ENABLE SCRIPT"
+MasterBtn.TextColor3       = WHITE
+MasterBtn.Font             = Enum.Font.GothamBold
+MasterBtn.TextSize         = 11
+MasterBtn.AutoButtonColor  = false
+MasterBtn.BorderSizePixel  = 0
+MasterBtn.LayoutOrder      = 1
+MasterBtn.Parent           = MainPage
+corner(MasterBtn, 6)
+outline(MasterBtn, PURPLE, 1)
+
+MasterBtn.MouseEnter:Connect(function()
+    TweenService:Create(MasterBtn, TweenInfo.new(0.1), {BackgroundColor3 = MGREY}):Play()
+end)
+MasterBtn.MouseLeave:Connect(function()
+    TweenService:Create(MasterBtn, TweenInfo.new(0.1), {BackgroundColor3 = DKGREY}):Play()
+end)
+
+local InfoLbl = label(MainPage, "Replaces rarity names with an\nanimated OG shimmer effect.", 9, TXLO, Enum.TextXAlignment.Center)
+InfoLbl.Size        = UDim2.new(1, 0, 0, 26)
+InfoLbl.TextWrapped = true
+InfoLbl.LayoutOrder = 2
+
+-- ==========================================
+-- RARITIES PAGE
+-- ==========================================
+listLayout(RaritiesPage, 4)
+pad(RaritiesPage, 5, 5, 1, 1)
+
+local rarityDotColors = {
+    Common    = Color3.fromRGB(200, 200, 205),
+    Rare      = Color3.fromRGB( 70, 130, 235),
+    Epic      = Color3.fromRGB(155,  65, 225),
+    Legendary = Color3.fromRGB(235, 150,  30),
+    Mythic    = Color3.fromRGB(225,  55,  65),
+    Secret    = Color3.fromRGB( 40, 215, 195),
+}
+local rarityOrder = {"Common","Rare","Epic","Legendary","Mythic","Secret"}
+
+for _, rarity in ipairs(rarityOrder) do
+    local row = Instance.new("Frame")
+    row.Size             = UDim2.new(1, 0, 0, 28)
+    row.BackgroundColor3 = DKGREY
+    row.BorderSizePixel  = 0
+    row.Parent           = RaritiesPage
+    corner(row, 6)
+    outline(row, LGREY, 1)
+
+    local dot = Instance.new("Frame")
+    dot.Size             = UDim2.new(0, 7, 0, 7)
+    dot.Position         = UDim2.new(0, 8, 0.5, -3.5)
+    dot.BackgroundColor3 = rarityDotColors[rarity]
+    dot.BorderSizePixel  = 0
+    dot.Parent           = row
+    corner(dot, 4)
+
+    local lbl = label(row, rarity, 10, WHITE, Enum.TextXAlignment.Left)
+    lbl.Size     = UDim2.new(0, 90, 1, 0)
+    lbl.Position = UDim2.new(0, 21, 0, 0)
+
+    local tog = Instance.new("TextButton")
+    tog.Size             = UDim2.new(0, 36, 0, 17)
+    tog.Position         = UDim2.new(1, -42, 0.5, -8.5)
+    tog.BackgroundColor3 = GREEN
+    tog.Text             = "ON"
+    tog.TextColor3       = BLACK
+    tog.Font             = Enum.Font.GothamBold
+    tog.TextSize         = 9
+    tog.AutoButtonColor  = false
+    tog.Parent           = row
+    corner(tog, 4)
+
+    tog.MouseButton1Click:Connect(function()
+        selectedRarities[rarity] = not selectedRarities[rarity]
+        if selectedRarities[rarity] then
+            TweenService:Create(tog, TweenInfo.new(0.1), {BackgroundColor3 = GREEN}):Play()
+            tog.TextColor3 = BLACK
+            tog.Text = "ON"
+            applyOG()
+        else
+            TweenService:Create(tog, TweenInfo.new(0.1), {BackgroundColor3 = GREY}):Play()
+            tog.TextColor3 = WHITE
+            tog.Text = "OFF"
+            revertSpecific(rarity)
+        end
+    end)
+end
+
+-- ==========================================
+-- SETTINGS PAGE
+-- ==========================================
+listLayout(SettingsPage, 4)
+pad(SettingsPage, 5, 5, 1, 1)
+
+local function secLabel(txt, order)
+    local l = label(SettingsPage, txt, 8, TXLO, Enum.TextXAlignment.Left)
+    l.Size        = UDim2.new(1, 0, 0, 11)
+    l.LayoutOrder = order
+end
+
+local function kbBtn(txt, order)
+    local b = Instance.new("TextButton")
+    b.Size             = UDim2.new(1, 0, 0, 24)
+    b.BackgroundColor3 = DKGREY
+    b.Text             = txt
+    b.TextColor3       = PURPLE
+    b.Font             = Enum.Font.GothamBold
+    b.TextSize         = 10
+    b.AutoButtonColor  = false
+    b.BorderSizePixel  = 0
+    b.LayoutOrder      = order
+    b.Parent           = SettingsPage
+    corner(b, 6)
+    outline(b, LGREY, 1)
+
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.1), {BackgroundColor3 = MGREY}):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b, TweenInfo.new(0.1), {BackgroundColor3 = DKGREY}):Play()
+    end)
+    return b
+end
+
+secLabel("  Toggle UI", 1)
+local UIKeyBtn = kbBtn(uiKeybind.Name, 2)
+
+secLabel("  Enable / Disable", 3)
+local MasterKeyBtn = kbBtn(masterKeybind.Name, 4)
+
+-- divider
+local SDivider = Instance.new("Frame")
+SDivider.Size             = UDim2.new(1, 0, 0, 1)
+SDivider.BackgroundColor3 = LGREY
+SDivider.BorderSizePixel  = 0
+SDivider.LayoutOrder      = 5
+SDivider.Parent           = SettingsPage
+
+local MinSquareBtn = Instance.new("TextButton")
+MinSquareBtn.Size             = UDim2.new(1, 0, 0, 24)
+MinSquareBtn.BackgroundColor3 = DKGREY
+MinSquareBtn.Text             = "Mini Square: ON"
+MinSquareBtn.TextColor3       = GREEN
+MinSquareBtn.Font             = Enum.Font.GothamSemibold
+MinSquareBtn.TextSize         = 10
+MinSquareBtn.AutoButtonColor  = false
+MinSquareBtn.BorderSizePixel  = 0
+MinSquareBtn.LayoutOrder      = 6
+MinSquareBtn.Parent           = SettingsPage
+corner(MinSquareBtn, 6)
+outline(MinSquareBtn, LGREY, 1)
+
+MinSquareBtn.MouseEnter:Connect(function()
+    TweenService:Create(MinSquareBtn, TweenInfo.new(0.1), {BackgroundColor3 = MGREY}):Play()
+end)
+MinSquareBtn.MouseLeave:Connect(function()
+    TweenService:Create(MinSquareBtn, TweenInfo.new(0.1), {BackgroundColor3 = DKGREY}):Play()
+end)
+
+-- ==========================================
+-- OG GRADIENT SEQUENCES
+-- ==========================================
+local function getOGSequence(shift)
+    local kp, cycle = {}, 0.85
+    for i = 0, 15 do
+        local x     = i / 15
+        local phase = ((x - shift) % cycle) / cycle
+        local c
+        if     phase < 0.05 then c = richGold
+        elseif phase < 0.15 then c = richGold:Lerp(darkGold,  (phase-0.05)/0.10)
+        elseif phase < 0.25 then c = darkGold:Lerp(blackBand, (phase-0.15)/0.10)
+        elseif phase < 0.50 then c = blackBand
+        elseif phase < 0.60 then c = blackBand:Lerp(darkGold, (phase-0.50)/0.10)
+        elseif phase < 0.70 then c = darkGold:Lerp(richGold,  (phase-0.60)/0.10)
+        else                     c = richGold
+        end
+        table.insert(kp, ColorSequenceKeypoint.new(x, c))
+    end
+    return ColorSequence.new(kp)
+end
+
+local function getSecretSequence(shift)
+    local kp, cycle = {}, 0.85
+    for i = 0, 15 do
+        local x     = i / 15
+        local phase = ((x - shift) % cycle) / cycle
+        local c
+        if     phase < 0.05 then c = richGold
+        elseif phase < 0.15 then c = richGold:Lerp(secretWhite,  (phase-0.05)/0.10)
+        elseif phase < 0.25 then c = secretWhite:Lerp(blackBand, (phase-0.15)/0.10)
+        elseif phase < 0.50 then c = blackBand
+        elseif phase < 0.60 then c = blackBand:Lerp(secretWhite, (phase-0.50)/0.10)
+        elseif phase < 0.70 then c = secretWhite:Lerp(richGold,  (phase-0.60)/0.10)
+        else                     c = richGold
+        end
+        table.insert(kp, ColorSequenceKeypoint.new(x, c))
+    end
+    return ColorSequence.new(kp)
+end
+
+-- ==========================================
+-- CORE LOGIC
+-- ==========================================
+applyOG = function()
+    if not isMasterEnabled then return end
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("TextLabel") then
+            local rawText = originalStates[obj] and originalStates[obj].OriginalText or obj.Text
+            if selectedRarities[rawText] then
+                if not originalStates[obj] then
+                    originalStates[obj] = {
+                        OriginalText           = obj.Text,
+                        TextColor3             = obj.TextColor3,
+                        TextStrokeTransparency = obj.TextStrokeTransparency,
+                        TextStrokeColor3       = obj.TextStrokeColor3,
+                    }
+                end
+                obj.Text                   = "OG"
+                obj.TextColor3             = Color3.fromRGB(255, 255, 255)
+                obj.TextStrokeTransparency = 0
+                obj.TextStrokeColor3       = Color3.fromRGB(0, 0, 0)
+                if not obj:FindFirstChild("OGGradient") then
+                    local g    = Instance.new("UIGradient")
+                    g.Name     = "OGGradient"
+                    g.Rotation = 90
+                    g.Parent   = obj
+                    if rawText == "Secret" then
+                        table.insert(secretGradients, g)
+                    else
+                        table.insert(activeGradients, g)
+                    end
+                end
+            end
+        end
+    end
+end
+
+revertSpecific = function(rarityName)
+    local toRemove = {}
+    for obj, state in pairs(originalStates) do
+        if state.OriginalText == rarityName then
+            table.insert(toRemove, obj)
+        end
+    end
+    for _, obj in ipairs(toRemove) do
+        local state = originalStates[obj]
+        if state and obj and obj.Parent then
+            obj.Text                   = state.OriginalText
+            obj.TextColor3             = state.TextColor3
+            obj.TextStrokeTransparency = state.TextStrokeTransparency
+            obj.TextStrokeColor3       = state.TextStrokeColor3
+            local g = obj:FindFirstChild("OGGradient")
+            if g then g:Destroy() end
+        end
+        originalStates[obj] = nil
+    end
+    for i = #activeGradients, 1, -1 do
+        if not activeGradients[i] or not activeGradients[i].Parent then
+            table.remove(activeGradients, i)
+        end
+    end
+    for i = #secretGradients, 1, -1 do
+        if not secretGradients[i] or not secretGradients[i].Parent then
+            table.remove(secretGradients, i)
+        end
+    end
+end
+
+local function revertAll()
+    local rarities = {}
+    for _, state in pairs(originalStates) do rarities[state.OriginalText] = true end
+    for name in pairs(rarities) do revertSpecific(name) end
+    table.clear(activeGradients)
+    table.clear(secretGradients)
+end
+
+-- ==========================================
+-- UI CONNECTIONS
+-- ==========================================
+local function toggleMaster()
+    isMasterEnabled = not isMasterEnabled
+    if isMasterEnabled then
+        MasterBtn.Text      = "⏹  DISABLE SCRIPT"
+        MasterBtn.TextColor3 = GREEN
+        local s = MasterBtn:FindFirstChildOfClass("UIStroke")
+        if s then s.Color = GREEN end
+        TweenService:Create(StatusDot, TweenInfo.new(0.2), {BackgroundColor3 = GREEN}):Play()
+        StatusText.Text      = "Script Active"
+        StatusText.TextColor3 = GREEN
+        applyOG()
+    else
+        MasterBtn.Text      = "▶  ENABLE SCRIPT"
+        MasterBtn.TextColor3 = WHITE
+        local s = MasterBtn:FindFirstChildOfClass("UIStroke")
+        if s then s.Color = PURPLE end
+        TweenService:Create(StatusDot, TweenInfo.new(0.2), {BackgroundColor3 = RED}):Play()
+        StatusText.Text      = "Script Inactive"
+        StatusText.TextColor3 = TXLO
+        revertAll()
+    end
+end
+
+local function toggleMinimize()
+    if useMinimizeSquare then
+        if Main.Visible then
+            Main.Visible      = false
+            MinFrame.Visible  = true
+            MinFrame.Position = Main.Position
+        else
+            Main.Visible      = true
+            MinFrame.Visible  = false
+            Main.Position     = MinFrame.Position
+        end
+    else
+        Main.Visible     = not Main.Visible
+        MinFrame.Visible = false
+    end
+end
+
+MasterBtn.MouseButton1Click:Connect(toggleMaster)
+MinBtn.MouseButton1Click:Connect(toggleMinimize)
+
+local _dcp
+MinFrame.InputBegan:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1
+    or i.UserInputType == Enum.UserInputType.Touch then
+        _dcp = i.Position
+    end
+end)
+MinFrame.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1
+    or i.UserInputType == Enum.UserInputType.Touch then
+        if _dcp and (i.Position - _dcp).Magnitude < 10 then toggleMinimize() end
+    end
+end)
+
+MinSquareBtn.MouseButton1Click:Connect(function()
+    useMinimizeSquare = not useMinimizeSquare
+    if useMinimizeSquare then
+        MinSquareBtn.TextColor3 = GREEN
+        MinSquareBtn.Text = "Mini Square: ON"
+    else
+        MinSquareBtn.TextColor3 = RED
+        MinSquareBtn.Text = "Mini Square: OFF"
+        if MinFrame.Visible then
+            MinFrame.Visible = false
+            Main.Visible     = true
+        end
+    end
+end)
+
+local function startBinding(target, btn)
+    if isBinding and bindingBtn and bindingBtn ~= btn then
+        bindingBtn.Text      = (bindingTarget == "UI" and uiKeybind or masterKeybind).Name
+        bindingBtn.TextColor3 = PURPLE
+    end
+    isBinding     = true
+    bindingTarget = target
+    bindingBtn    = btn
+    btn.Text      = "[ press key... ]"
+    btn.TextColor3 = TXLO
+end
+
+UIKeyBtn.MouseButton1Click:Connect(function() startBinding("UI", UIKeyBtn) end)
+MasterKeyBtn.MouseButton1Click:Connect(function() startBinding("Master", MasterKeyBtn) end)
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if isBinding and input.UserInputType == Enum.UserInputType.Keyboard then
+        if bindingTarget == "UI" then
+            uiKeybind          = input.KeyCode
+            UIKeyBtn.Text      = uiKeybind.Name
+            UIKeyBtn.TextColor3 = PURPLE
+        elseif bindingTarget == "Master" then
+            masterKeybind          = input.KeyCode
+            MasterKeyBtn.Text      = masterKeybind.Name
+            MasterKeyBtn.TextColor3 = PURPLE
+        end
+        isBinding     = false
+        bindingTarget = nil
+        bindingBtn    = nil
+    elseif not gp and not isBinding then
+        if input.KeyCode == uiKeybind    then toggleMinimize() end
+        if input.KeyCode == masterKeybind then toggleMaster()  end
+    end
+end)
+
+-- ==========================================
+-- RENDER LOOP
+-- ==========================================
+RunService.RenderStepped:Connect(function()
+    if not isMasterEnabled then return end
+    local shift  = (os.clock() * 0.4) % 0.85
+    local ogSeq  = getOGSequence(shift)
+    local secSeq = getSecretSequence(shift)
+    for i = #activeGradients, 1, -1 do
+        local g = activeGradients[i]
+        if g and g.Parent then g.Color = ogSeq
+        else table.remove(activeGradients, i) end
+    end
+    for i = #secretGradients, 1, -1 do
+        local g = secretGradients[i]
+        if g and g.Parent then g.Color = secSeq
+        else table.remove(secretGradients, i) end
+    end
+end)
+
+task.spawn(function()
+    while task.wait(2) do applyOG() end
+end)
