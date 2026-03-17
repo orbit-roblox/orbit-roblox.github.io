@@ -734,7 +734,6 @@ local function triggerCustomStartUI(targetUser)
     overlay.Parent                 = screenGui
 
     local mainFrame = Instance.new("Frame")
-    mainFrame.Size             = UDim2.new(0, 420, 0, 210)
     mainFrame.Position         = UDim2.new(0.5, 0, 0.5, 0)
     mainFrame.AnchorPoint      = Vector2.new(0.5, 0.5)
     mainFrame.BackgroundColor3 = Color3.fromRGB(25, 26, 31)
@@ -762,9 +761,9 @@ local function triggerCustomStartUI(targetUser)
     mainCloseButton.Position         = UDim2.new(1, -30, 0, 15)
     mainCloseButton.BackgroundTransparency = 1
     mainCloseButton.Text             = "X"
-    mainCloseButton.TextColor3       = Color3.fromRGB(200, 200, 200)
-    mainCloseButton.TextSize         = 16
-    mainCloseButton.Font             = Enum.Font.GothamBold
+    mainCloseButton.TextColor3       = Color3.fromRGB(255, 255, 255)
+    mainCloseButton.TextSize         = 12
+    mainCloseButton.Font             = Enum.Font.Gotham
     mainCloseButton.ZIndex           = 2
     mainCloseButton.Parent           = mainFrame
 
@@ -846,6 +845,8 @@ local function triggerCustomStartUI(targetUser)
     priceText.ZIndex           = 2
     priceText.Parent           = mainFrame
 
+    mainFrame.Size             = UDim2.new(0, 420, 0, 235)
+
     local startButton = Instance.new("TextButton")
     startButton.Size             = UDim2.new(1, -40, 0, 45)
     startButton.Position         = UDim2.new(0, 20, 0, 140)
@@ -876,6 +877,19 @@ local function triggerCustomStartUI(targetUser)
     startText.Font               = Enum.Font.GothamBold
     startText.ZIndex             = 3
     startText.Parent             = startButton
+
+    local disclaimerLabel = Instance.new("TextLabel")
+    disclaimerLabel.Size               = UDim2.new(1, -40, 0, 30)
+    disclaimerLabel.Position           = UDim2.new(0, 20, 0, 193)
+    disclaimerLabel.BackgroundTransparency = 1
+    disclaimerLabel.Text               = "Your payment method will be charged. Roblox Terms of Use apply."
+    disclaimerLabel.TextColor3         = Color3.fromRGB(160, 160, 165)
+    disclaimerLabel.TextSize           = 11
+    disclaimerLabel.Font               = Enum.Font.Gotham
+    disclaimerLabel.TextXAlignment     = Enum.TextXAlignment.Center
+    disclaimerLabel.TextWrapped        = true
+    disclaimerLabel.ZIndex             = 2
+    disclaimerLabel.Parent             = mainFrame
 
     local successFrame = Instance.new("Frame")
     successFrame.Size             = UDim2.new(0, 0, 0, 0)
