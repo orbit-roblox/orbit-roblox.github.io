@@ -74,33 +74,58 @@ end
 -- ==========================================
 -- WAVE GRADIENT
 -- ==========================================
-local function buildWaveGradient(parent)
+local function buildWaveGradient(parent, rot)
     local g    = Instance.new("UIGradient")
-    g.Rotation = 45
+    g.Rotation = rot or 45
     g.Parent   = parent
     return g
 end
 
+-- Chromewave: sharp bright peaks of vivid purple/violet/indigo/magenta
+-- surrounded by deep black troughs — like light reflecting off chrome
+local WAVE_STOPS = {
+    Color3.fromRGB(  0,   0,   0),  -- [1] pure black
+    Color3.fromRGB(  8,   0,  18),  -- [2] near-black indigo
+    Color3.fromRGB( 22,   2,  48),  -- [3] very dark violet
+    Color3.fromRGB( 55,   5, 115),  -- [4] deep purple
+    Color3.fromRGB(110,  20, 210),  -- [5] vivid purple PEAK 1
+    Color3.fromRGB( 80,  10, 160),  -- [6] mid purple
+    Color3.fromRGB( 30,   3,  70),  -- [7] dark purple
+    Color3.fromRGB(  5,   0,  14),  -- [8] near-black
+    Color3.fromRGB(  0,   0,   0),  -- [9] black trough
+    Color3.fromRGB(  6,   0,  20),  -- [10] near-black blue-indigo
+    Color3.fromRGB( 18,   4,  55),  -- [11] deep indigo
+    Color3.fromRGB( 50,  15, 130),  -- [12] indigo-purple
+    Color3.fromRGB( 85,  35, 200),  -- [13] blue-violet PEAK 2
+    Color3.fromRGB(120,  20, 220),  -- [14] vivid violet (brightest)
+    Color3.fromRGB( 75,   8, 155),  -- [15] cool purple
+    Color3.fromRGB( 35,   3,  75),  -- [16] dark violet
+    Color3.fromRGB(  8,   0,  20),  -- [17] near-black
+    Color3.fromRGB(  0,   0,   0),  -- [18] black trough
+    Color3.fromRGB( 10,   0,  22),  -- [19] near-black magenta-purple
+    Color3.fromRGB( 35,   5,  70),  -- [20] dark magenta-purple
+    Color3.fromRGB( 80,  15, 145),  -- [21] magenta-purple
+    Color3.fromRGB(130,  25, 190),  -- [22] magenta-violet PEAK 3
+    Color3.fromRGB( 90,  12, 160),  -- [23] cool magenta
+    Color3.fromRGB( 40,   4,  88),  -- [24] deep cool purple
+    Color3.fromRGB( 12,   1,  28),  -- [25] near-black
+    Color3.fromRGB(  0,   0,   0),  -- [26] black — back to start
+}
+local WAVE_N = #WAVE_STOPS - 1
+
 local function getWaveSequence(shift)
-    local c0 = Color3.fromRGB(  0,   0,   0)   -- black
-    local c1 = Color3.fromRGB( 14,   2,  30)   -- near-black purple
-    local c2 = Color3.fromRGB( 40,   8,  80)   -- deep purple
-    local c3 = Color3.fromRGB( 90,  20, 170)   -- mid-bright purple
-    local c4 = Color3.fromRGB( 50,  10, 110)   -- medium-dark purple
-    local c5 = Color3.fromRGB( 18,   2,  40)   -- very dark purple
     local kp = {}
-    local N  = 20
+    local N  = 32
     for i = 0, N do
         local x     = i / N
         local phase = ((x - shift) % 1 + 1) % 1
-        local c
-        if     phase < 0.15 then c = c0:Lerp(c1,  phase / 0.15)
-        elseif phase < 0.30 then c = c1:Lerp(c2, (phase-0.15)/0.15)
-        elseif phase < 0.45 then c = c2:Lerp(c3, (phase-0.30)/0.15)
-        elseif phase < 0.60 then c = c3:Lerp(c4, (phase-0.45)/0.15)
-        elseif phase < 0.75 then c = c4:Lerp(c5, (phase-0.60)/0.15)
-        else                     c = c5:Lerp(c0, (phase-0.75)/0.25)
-        end
+        local fi    = phase * WAVE_N
+        local lo    = math.floor(fi)
+        local hi    = math.min(lo + 1, WAVE_N)
+        local t     = fi - lo
+        -- ease through peaks with smoothstep for chrome sharpness
+        t = t * t * (3 - 2 * t)
+        local c = WAVE_STOPS[lo + 1]:Lerp(WAVE_STOPS[hi + 1], t)
         table.insert(kp, ColorSequenceKeypoint.new(math.min(x, 1), c))
     end
     return ColorSequence.new(kp)
@@ -151,12 +176,12 @@ waveBg.BorderSizePixel  = 0
 waveBg.ZIndex           = 1
 waveBg.Parent           = controlFrame
 corner(waveBg, 10)
-local waveGrad = buildWaveGradient(waveBg)
+local waveGrad = buildWaveGradient(waveBg, 35)
 
 -- Top bar
 local topBar = Instance.new("Frame")
 topBar.Size             = UDim2.new(1, 0, 0, 38)
-topBar.BackgroundColor3 = Color3.fromRGB(8, 0, 18)
+topBar.BackgroundColor3 = Color3.fromRGB(6, 0, 16)
 topBar.BorderSizePixel  = 0
 topBar.ZIndex           = 3
 topBar.Parent           = controlFrame
@@ -165,14 +190,14 @@ corner(topBar, 10)
 local topFix = Instance.new("Frame")
 topFix.Size             = UDim2.new(1, 0, 0, 10)
 topFix.Position         = UDim2.new(0, 0, 1, -10)
-topFix.BackgroundColor3 = Color3.fromRGB(8, 0, 18)
+topFix.BackgroundColor3 = Color3.fromRGB(6, 0, 16)
 topFix.BorderSizePixel  = 0
 topFix.ZIndex           = 3
 topFix.Parent           = topBar
 
--- Glowing separator line
+-- Chromewave separator — 2px, vivid multi-stop gradient
 local topLine = Instance.new("Frame")
-topLine.Size             = UDim2.new(1, 0, 0, 1)
+topLine.Size             = UDim2.new(1, 0, 0, 2)
 topLine.Position         = UDim2.new(0, 0, 0, 38)
 topLine.BackgroundColor3 = PURPLE
 topLine.BorderSizePixel  = 0
@@ -180,10 +205,14 @@ topLine.ZIndex           = 4
 topLine.Parent           = controlFrame
 local lineGrad = Instance.new("UIGradient")
 lineGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0,   Color3.fromRGB(30, 0, 60)),
-    ColorSequenceKeypoint.new(0.35, PURPLE),
-    ColorSequenceKeypoint.new(0.65, Color3.fromRGB(190, 110, 255)),
-    ColorSequenceKeypoint.new(1,   Color3.fromRGB(30, 0, 60)),
+    ColorSequenceKeypoint.new(0,    Color3.fromRGB(  8,  0,  20)),
+    ColorSequenceKeypoint.new(0.12, Color3.fromRGB( 60,  8, 130)),
+    ColorSequenceKeypoint.new(0.28, Color3.fromRGB(130, 30, 255)),
+    ColorSequenceKeypoint.new(0.45, Color3.fromRGB(180, 80, 255)),
+    ColorSequenceKeypoint.new(0.55, Color3.fromRGB(210,120, 255)),
+    ColorSequenceKeypoint.new(0.72, Color3.fromRGB(100, 20, 200)),
+    ColorSequenceKeypoint.new(0.88, Color3.fromRGB( 50,  5, 110)),
+    ColorSequenceKeypoint.new(1,    Color3.fromRGB(  8,  0,  20)),
 })
 lineGrad.Parent = topLine
 
@@ -199,13 +228,16 @@ controlTitle.TextSize           = 13
 controlTitle.TextXAlignment     = Enum.TextXAlignment.Left
 controlTitle.ZIndex             = 4
 controlTitle.Parent             = topBar
--- Subtle white-to-light-purple gradient on title
+-- Chromewave shimmer on title text
 local titleGrad = Instance.new("UIGradient")
 titleGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0,   WHITE),
-    ColorSequenceKeypoint.new(0.55, WHITE),
-    ColorSequenceKeypoint.new(1,   Color3.fromRGB(195, 140, 255)),
+    ColorSequenceKeypoint.new(0,    Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.30, Color3.fromRGB(230, 200, 255)),
+    ColorSequenceKeypoint.new(0.55, Color3.fromRGB(190, 110, 255)),
+    ColorSequenceKeypoint.new(0.75, Color3.fromRGB(160,  60, 255)),
+    ColorSequenceKeypoint.new(1,    Color3.fromRGB(120,  20, 220)),
 })
+titleGrad.Rotation = 5
 titleGrad.Parent = controlTitle
 
 -- Minimize button
@@ -255,8 +287,8 @@ local CW = UDim2.new(1, -20, 0, 30)
 local S  = 36
 local cy = 48
 
-local BASE_BTN = Color3.fromRGB(12, 2, 24)
-local HOVR_BTN = Color3.fromRGB(24, 4, 48)
+local BASE_BTN = Color3.fromRGB( 10,  1, 22)
+local HOVR_BTN = Color3.fromRGB( 28,  5, 58)
 
 -- Status row
 local statusRow = Instance.new("Frame")
@@ -317,7 +349,7 @@ balLabel.Size               = UDim2.new(1, -20, 0, 14)
 balLabel.Position           = UDim2.new(0, CX, 0, cy)
 balLabel.BackgroundTransparency = 1
 balLabel.Text               = "  FAKE BALANCE"
-balLabel.TextColor3         = Color3.fromRGB(100, 50, 180)
+balLabel.TextColor3         = Color3.fromRGB(130, 60, 220)
 balLabel.Font               = Enum.Font.GothamSemibold
 balLabel.TextSize           = 8
 balLabel.TextXAlignment     = Enum.TextXAlignment.Left
@@ -349,7 +381,7 @@ giftLabel.Size               = UDim2.new(1, -20, 0, 14)
 giftLabel.Position           = UDim2.new(0, CX, 0, cy)
 giftLabel.BackgroundTransparency = 1
 giftLabel.Text               = "  GIFT TARGET"
-giftLabel.TextColor3         = Color3.fromRGB(100, 50, 180)
+giftLabel.TextColor3         = Color3.fromRGB(130, 60, 220)
 giftLabel.Font               = Enum.Font.GothamSemibold
 giftLabel.TextSize           = 8
 giftLabel.TextXAlignment     = Enum.TextXAlignment.Left
@@ -434,11 +466,11 @@ sWaveBg.BorderSizePixel  = 0
 sWaveBg.ZIndex           = 1
 sWaveBg.Parent           = settingsFrame
 corner(sWaveBg, 10)
-local sWaveGrad = buildWaveGradient(sWaveBg)
+local sWaveGrad = buildWaveGradient(sWaveBg, 55)
 
 local sTopBar = Instance.new("Frame")
 sTopBar.Size             = UDim2.new(1, 0, 0, 38)
-sTopBar.BackgroundColor3 = Color3.fromRGB(8, 0, 18)
+sTopBar.BackgroundColor3 = Color3.fromRGB(6, 0, 16)
 sTopBar.BorderSizePixel  = 0
 sTopBar.ZIndex           = 3
 sTopBar.Parent           = settingsFrame
@@ -447,13 +479,13 @@ corner(sTopBar, 10)
 local sTopFix = Instance.new("Frame")
 sTopFix.Size             = UDim2.new(1, 0, 0, 10)
 sTopFix.Position         = UDim2.new(0, 0, 1, -10)
-sTopFix.BackgroundColor3 = Color3.fromRGB(8, 0, 18)
+sTopFix.BackgroundColor3 = Color3.fromRGB(6, 0, 16)
 sTopFix.BorderSizePixel  = 0
 sTopFix.ZIndex           = 3
 sTopFix.Parent           = sTopBar
 
 local sTopLine = Instance.new("Frame")
-sTopLine.Size             = UDim2.new(1, 0, 0, 1)
+sTopLine.Size             = UDim2.new(1, 0, 0, 2)
 sTopLine.Position         = UDim2.new(0, 0, 0, 38)
 sTopLine.BackgroundColor3 = PURPLE
 sTopLine.BorderSizePixel  = 0
@@ -461,9 +493,13 @@ sTopLine.ZIndex           = 4
 sTopLine.Parent           = settingsFrame
 local sLineGrad = Instance.new("UIGradient")
 sLineGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0,   Color3.fromRGB(30, 0, 60)),
-    ColorSequenceKeypoint.new(0.5, PURPLE),
-    ColorSequenceKeypoint.new(1,   Color3.fromRGB(30, 0, 60)),
+    ColorSequenceKeypoint.new(0,    Color3.fromRGB(  8,  0,  20)),
+    ColorSequenceKeypoint.new(0.15, Color3.fromRGB( 70, 10, 150)),
+    ColorSequenceKeypoint.new(0.35, Color3.fromRGB(150, 40, 255)),
+    ColorSequenceKeypoint.new(0.50, Color3.fromRGB(210,120, 255)),
+    ColorSequenceKeypoint.new(0.65, Color3.fromRGB(140, 30, 240)),
+    ColorSequenceKeypoint.new(0.85, Color3.fromRGB( 55,  5, 120)),
+    ColorSequenceKeypoint.new(1,    Color3.fromRGB(  8,  0,  20)),
 })
 sLineGrad.Parent = sTopLine
 
@@ -524,7 +560,7 @@ kbSectionLbl.Size               = UDim2.new(1, -20, 0, 14)
 kbSectionLbl.Position           = UDim2.new(0, 10, 0, 46)
 kbSectionLbl.BackgroundTransparency = 1
 kbSectionLbl.Text               = "  SHOW / HIDE KEYBIND"
-kbSectionLbl.TextColor3         = Color3.fromRGB(100, 50, 180)
+kbSectionLbl.TextColor3         = Color3.fromRGB(130, 60, 220)
 kbSectionLbl.Font               = Enum.Font.GothamSemibold
 kbSectionLbl.TextSize           = 8
 kbSectionLbl.TextXAlignment     = Enum.TextXAlignment.Left
@@ -560,13 +596,14 @@ keybindHint.ZIndex             = 2
 keybindHint.Parent             = settingsFrame
 
 -- ==========================================
--- WAVE RENDER LOOP
+-- WAVE RENDER LOOP  (dual phase for chrome depth)
 -- ==========================================
 RunService.RenderStepped:Connect(function()
-    local shift = (os.clock() * 0.22) % 1
-    local seq   = getWaveSequence(shift)
-    waveGrad.Color  = seq
-    sWaveGrad.Color = seq
+    local t      = os.clock() * 0.28
+    local seqA   = getWaveSequence( t      % 1)  -- main panel
+    local seqB   = getWaveSequence((t+0.4) % 1)  -- settings panel (offset = different phase)
+    waveGrad.Color  = seqA
+    sWaveGrad.Color = seqB
 end)
 
 -- ==========================================
@@ -700,7 +737,7 @@ local function triggerCustomStartUI(targetUser)
     mainFrame.Size             = UDim2.new(0, 420, 0, 210)
     mainFrame.Position         = UDim2.new(0.5, 0, 0.5, 0)
     mainFrame.AnchorPoint      = Vector2.new(0.5, 0.5)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(25, 26, 31)
     mainFrame.ClipsDescendants = true
     mainFrame.ZIndex           = 2
     mainFrame.Parent           = screenGui
@@ -812,7 +849,7 @@ local function triggerCustomStartUI(targetUser)
     local startButton = Instance.new("TextButton")
     startButton.Size             = UDim2.new(1, -40, 0, 45)
     startButton.Position         = UDim2.new(0, 20, 0, 140)
-    startButton.BackgroundColor3 = Color3.fromRGB(30, 45, 100)
+    startButton.BackgroundColor3 = Color3.fromRGB(18, 40, 50)
     startButton.Text             = ""
     startButton.ZIndex           = 2
     startButton.Parent           = mainFrame
@@ -822,7 +859,7 @@ local function triggerCustomStartUI(targetUser)
 
     local loadingFill = Instance.new("Frame")
     loadingFill.Size             = UDim2.new(0, 0, 1, 0)
-    loadingFill.BackgroundColor3 = Color3.fromRGB(50, 130, 255)
+    loadingFill.BackgroundColor3 = Color3.fromRGB(37, 150, 190)
     loadingFill.BorderSizePixel  = 0
     loadingFill.ZIndex           = 2
     loadingFill.Parent           = startButton
@@ -844,7 +881,7 @@ local function triggerCustomStartUI(targetUser)
     successFrame.Size             = UDim2.new(0, 0, 0, 0)
     successFrame.Position         = UDim2.new(0.5, 0, 0.5, 0)
     successFrame.AnchorPoint      = Vector2.new(0.5, 0.5)
-    successFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    successFrame.BackgroundColor3 = Color3.fromRGB(25, 26, 31)
     successFrame.ClipsDescendants = true
     successFrame.Visible          = false
     successFrame.ZIndex           = 2
@@ -913,7 +950,7 @@ local function triggerCustomStartUI(targetUser)
     local okButton = Instance.new("TextButton")
     okButton.Size             = UDim2.new(1, -40, 0, 40)
     okButton.Position         = UDim2.new(0, 20, 0, 140)
-    okButton.BackgroundColor3 = Color3.fromRGB(50, 130, 255)
+    okButton.BackgroundColor3 = Color3.fromRGB(37, 150, 190)
     okButton.Text             = "OK"
     okButton.TextColor3       = Color3.fromRGB(255, 255, 255)
     okButton.TextSize         = 16
