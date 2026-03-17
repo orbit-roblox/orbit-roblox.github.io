@@ -849,7 +849,7 @@ local function triggerCustomStartUI(targetUser)
     local startButton = Instance.new("TextButton")
     startButton.Size             = UDim2.new(1, -40, 0, 45)
     startButton.Position         = UDim2.new(0, 20, 0, 140)
-    startButton.BackgroundColor3 = Color3.fromRGB(18, 40, 50)
+    startButton.BackgroundColor3 = Color3.fromRGB(14, 20, 55)
     startButton.Text             = ""
     startButton.ZIndex           = 2
     startButton.Parent           = mainFrame
@@ -859,7 +859,7 @@ local function triggerCustomStartUI(targetUser)
 
     local loadingFill = Instance.new("Frame")
     loadingFill.Size             = UDim2.new(0, 0, 1, 0)
-    loadingFill.BackgroundColor3 = Color3.fromRGB(37, 150, 190)
+    loadingFill.BackgroundColor3 = Color3.fromRGB(43, 74, 227)
     loadingFill.BorderSizePixel  = 0
     loadingFill.ZIndex           = 2
     loadingFill.Parent           = startButton
@@ -950,7 +950,7 @@ local function triggerCustomStartUI(targetUser)
     local okButton = Instance.new("TextButton")
     okButton.Size             = UDim2.new(1, -40, 0, 40)
     okButton.Position         = UDim2.new(0, 20, 0, 140)
-    okButton.BackgroundColor3 = Color3.fromRGB(37, 150, 190)
+    okButton.BackgroundColor3 = Color3.fromRGB(43, 74, 227)
     okButton.Text             = "OK"
     okButton.TextColor3       = Color3.fromRGB(255, 255, 255)
     okButton.TextSize         = 16
