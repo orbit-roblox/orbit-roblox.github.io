@@ -1,4 +1,4 @@
-// api/[id].js — returns raw Lua code for a given script ID
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
