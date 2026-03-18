@@ -1,8 +1,20 @@
 {
-  "name": "orrxl4-protector",
-  "version": "1.0.0",
-  "description": "Lua script protector — generates loadstring URLs for Roblox scripts",
-  "engines": {
-    "node": ">=18"
-  }
+  "version": 2,
+  "public": true,
+  "buildCommand": null,
+  "outputDirectory": "public",
+  "routes": [
+    {
+      "src": "/api/store",
+      "dest": "/api/store.js"
+    },
+    {
+      "src": "/api/([a-z0-9]{8})",
+      "dest": "/api/[id].js?id=$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
 }
