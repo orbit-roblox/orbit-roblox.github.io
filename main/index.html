@@ -469,61 +469,7 @@
     </p>
     <div class="hero-btns">
       <a class="btn-primary" href="#hub">BROWSE SCRIPTS</a>
-      <a class="btn-secondary" href="#community">JOIN DISCORD</a>
-    </div>
-  </section>
-
-  <!-- PRODUCTS -->
-  <div class="sep"></div>
-  <section class="products-section" id="products">
-    <div class="section-heading">
-      <p class="eyebrow">// WHAT WE OFFER</p>
-      <h2>ORBIT <span>PRODUCTS</span></h2>
-    </div>
-    <div class="products-grid">
-      <div class="product-card featured">
-        <span class="product-badge">POPULAR</span>
-        <div class="product-icon">📁</div>
-        <h3>SCRIPT HUB</h3>
-        <p>Browse thousands of free, community-verified Lua scripts. Sorted by game, updated daily, zero ads.</p>
-        <a class="product-link" href="#hub">OPEN HUB →</a>
-      </div>
-      <div class="product-card">
-        <span class="product-badge new">FREE</span>
-        <div class="product-icon">🔒</div>
-        <h3>PROTECTOR</h3>
-        <p>Generate a secure loadstring for any script instantly. Your code gets a unique ID — no sign-up needed.</p>
-        <a class="product-link" href="/protector">LAUNCH TOOL →</a>
-      </div>
-      <div class="product-card">
-        <span class="product-badge community">COMMUNITY</span>
-        <div class="product-icon">💬</div>
-        <h3>DISCORD</h3>
-        <p>Get support, share scripts, report cheaters, and stay up to date with every Orbit release and drop.</p>
-        <a class="product-link discord-link" href="#community">JOIN SERVER →</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- SCRIPT HUB -->
-  <div class="sep"></div>
-  <section class="hub-section" id="hub">
-    <div class="section-heading">
-      <p class="eyebrow">// FREE SCRIPTS</p>
-      <h2>SCRIPT <span>HUB</span></h2>
-    </div>
-
-    <div class="hub-filter">
-      <button class="filter-btn active" onclick="filterScripts(this,'all')">ALL</button>
-      <button class="filter-btn" onclick="filterScripts(this,'op')">OP</button>
-      <button class="filter-btn" onclick="filterScripts(this,'util')">UTILITY</button>
-      <button class="filter-btn" onclick="filterScripts(this,'farm')">FARM</button>
-    </div>
-
-    <div class="scripts-grid" id="scriptsGrid"></div>
-
-    <div class="hub-cta">
-      <a class="btn-primary" href="#">VIEW ALL 2,400+ SCRIPTS →</a>
+      <a class="btn-secondary" href="https://discord.gg/HEaK8seEDW">JOIN DISCORD</a>
     </div>
   </section>
 
@@ -544,7 +490,7 @@
           <div class="discord-num">8.1K</div>
           <div class="discord-num-label">MEMBERS ONLINE</div>
         </div>
-        <a class="btn-discord" href="#">JOIN NOW →</a>
+        <a class="btn-discord" href="https://discord.gg/HEaK8seEDW">JOIN NOW →</a>
       </div>
     </div>
   </section>
@@ -555,7 +501,7 @@
     <ul class="footer-links">
       <li><a href="#hub">SCRIPT HUB</a></li>
       <li><a href="/protector">PROTECTOR</a></li>
-      <li><a href="#community">DISCORD</a></li>
+      <li><a href="https://discord.gg/HEaK8seEDW">DISCORD</a></li>
     </ul>
     <span class="footer-copy">© ORBIT SCRIPTS — NIGHTMARE EDITION</span>
   </footer>
@@ -610,47 +556,7 @@
       if(navDrawer) navDrawer.classList.toggle('open',o);
     });
 
-    /* ── SCRIPTS DATA ── */
-    const SCRIPTS = [
-      {name:'Blox Fruits Auto Farm',game:'Blox Fruits',desc:'Auto farm any island, boss killer, fruit sniper. Updated for Sea 4.',stars:'★★★★★',tag:'farm',views:'14.2k views'},
-      {name:'Pet Sim 99 Dupe',game:'Pet Simulator 99',desc:'Infinite coins, auto hatch eggs, speed hack. Undetected.',stars:'★★★★☆',tag:'op',views:'9.8k views'},
-      {name:'Universal ESP',game:'Universal',desc:'Wallhack ESP for any game. Player boxes, names, distance. Toggle menu.',stars:'★★★★★',tag:'util',views:'22.1k views'},
-      {name:'Brookhaven RP GUI',game:'Brookhaven RP',desc:'Speed, fly, noclip, infinite money, admin panel. One click install.',stars:'★★★★☆',tag:'util',views:'7.4k views'},
-      {name:'Arsenal Auto Aim',game:'Arsenal',desc:'Silent aim, FOV circle, speed control. Bypass anti-cheat.',stars:'★★★☆☆',tag:'op',views:'5.9k views'},
-      {name:'Anime Adventures Farm',game:'Anime Adventures',desc:'Auto wave clear, unit upgrader, AFK farm. Max units in minutes.',stars:'★★★★★',tag:'farm',views:'11.6k views'},
-    ];
 
-    const tagColors = {farm:'farm',op:'op',util:'util'};
-    let currentFilter = 'all';
-
-    function filterScripts(btn, tag){
-      document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFilter = tag;
-      renderScripts();
-    }
-
-    function renderScripts(){
-      const grid = document.getElementById('scriptsGrid');
-      const filtered = currentFilter==='all' ? SCRIPTS : SCRIPTS.filter(s=>s.tag===currentFilter);
-      grid.innerHTML = filtered.map(s=>`
-        <div class="script-card">
-          <div class="script-top">
-            <div>
-              <div class="script-name">${s.name}</div>
-              <div class="script-game">${s.game}</div>
-            </div>
-            <div class="script-stars">${s.stars}</div>
-          </div>
-          <div class="script-desc">${s.desc}</div>
-          <div class="script-footer">
-            <span class="script-tag ${tagColors[s.tag]}">${s.tag.toUpperCase()}</span>
-            <span class="script-views">${s.views}</span>
-          </div>
-        </div>
-      `).join('');
-    }
-    renderScripts();
   </script>
 </body>
 </html>
