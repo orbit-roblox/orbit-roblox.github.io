@@ -1,0 +1,8 @@
+{
+  "name": "orrxl4-protector",
+  "version": "1.0.0",
+  "description": "Lua script protector — generates loadstring URLs for Roblox scripts",
+  "engines": {
+    "node": ">=18"
+  }
+}
