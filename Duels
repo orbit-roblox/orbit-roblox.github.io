@@ -745,18 +745,18 @@ local C = {
 }
 
 -- Mobile gets a slightly wider panel + taller touch targets
-local PANEL_W        = IS_MOBILE and 255  or 230
-local PANEL_H        = IS_MOBILE and 510  or 480
-local BANNER_H       = 46
-local ROW_TOGGLE_H   = IS_MOBILE and 40   or 34
-local ROW_SLIDER_H   = IS_MOBILE and 54   or 50
-local KNOB_SZ        = IS_MOBILE and 17   or 13
-local KNOB_ON        = IS_MOBILE and 22   or 20
-local TRACK_W        = IS_MOBILE and 42   or 36
-local TRACK_H        = IS_MOBILE and 22   or 19
-local SLIDER_HIT_H   = IS_MOBILE and 44   or 30
-local SLIDER_HNDL_SZ = IS_MOBILE and 17   or 13
-local PBAR_W         = IS_MOBILE and 290  or 310
+local PANEL_W        = IS_MOBILE and 175  or 230
+local PANEL_H        = IS_MOBILE and 370  or 480
+local BANNER_H       = IS_MOBILE and 36   or 46
+local ROW_TOGGLE_H   = IS_MOBILE and 30   or 34
+local ROW_SLIDER_H   = IS_MOBILE and 44   or 50
+local KNOB_SZ        = IS_MOBILE and 13   or 13
+local KNOB_ON        = IS_MOBILE and 18   or 20
+local TRACK_W        = IS_MOBILE and 34   or 36
+local TRACK_H        = IS_MOBILE and 17   or 19
+local SLIDER_HIT_H   = IS_MOBILE and 32   or 30
+local SLIDER_HNDL_SZ = IS_MOBILE and 13   or 13
+local PBAR_W         = IS_MOBILE and 220  or 310
 
 -- Panel sits left on PC, right on mobile (avoids joystick)
 local PANEL_ANCHOR_X = IS_MOBILE
@@ -786,13 +786,14 @@ local function Grad(p,c,tr,rot)
 end
 
 -- ── FPS / Ping island ──────────────────────────────────────
-local Island = N("Frame",{BackgroundColor3=C.Panel,Size=UDim2.new(0,200,0,28),
-    Position=UDim2.new(0.5,-100,0,6),ZIndex=500,Parent=Gui})
+local Island = N("Frame",{BackgroundColor3=C.Panel,
+    Size=UDim2.new(0,IS_MOBILE and 150 or 200,0,IS_MOBILE and 22 or 28),
+    Position=UDim2.new(0.5,IS_MOBILE and -75 or -100,0,6),ZIndex=500,Parent=Gui})
 Rnd(14,Island); Bdr(Island,C.Iris,1,0.3)
 Grad(Island,ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(18,6,38)),
     ColorSequenceKeypoint.new(1,Color3.fromRGB(6,2,14))}),nil,90)
 local IslandLbl = N("TextLabel",{Text="FPS: -- | PING: --ms",Font=Enum.Font.GothamBold,
-    TextSize=11,TextColor3=C.IrisBright,BackgroundTransparency=1,
+    TextSize=IS_MOBILE and 9 or 11,TextColor3=C.IrisBright,BackgroundTransparency=1,
     Size=UDim2.new(1,0,1,0),ZIndex=501,Parent=Island})
 
 -- ── Notification system ────────────────────────────────────
@@ -889,7 +890,7 @@ Grad(TGrad,nil,NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenc
 -- Title shows a 📱 badge on mobile so the user knows which version loaded
 local TitleLbl = N("TextLabel",{
     Text = IS_MOBILE and "ORBIT — DUELS  📱" or "ORBIT — DUELS",
-    Font=Enum.Font.GothamBold,TextSize=IS_MOBILE and 12 or 14,
+    Font=Enum.Font.GothamBold,TextSize=IS_MOBILE and 10 or 14,
     TextColor3=C.IrisBright,BackgroundTransparency=1,Size=UDim2.new(1,-100,1,0),
     Position=UDim2.new(0,14,0,0),TextXAlignment=Enum.TextXAlignment.Left,ZIndex=9,Parent=TitleBar})
 Grad(TitleLbl,ColorSequence.new({
@@ -953,7 +954,7 @@ local ScrollFrame = N("ScrollingFrame",{
 })
 pcall(function() ScrollFrame.AutomaticCanvasSize=Enum.AutomaticSize.Y end)
 local CLayout = N("UIListLayout",{
-    Padding=UDim.new(0,IS_MOBILE and 6 or 5),
+    Padding=UDim.new(0,IS_MOBILE and 3 or 5),
     SortOrder=Enum.SortOrder.LayoutOrder,
     HorizontalAlignment=Enum.HorizontalAlignment.Center,Parent=ScrollFrame
 })
@@ -972,7 +973,7 @@ local VisualSetters = {}
 
 local function CreateSection(parent, title, order)
     local fr = N("Frame",{BackgroundColor3=C.IrisDark,BackgroundTransparency=0.55,
-        Size=UDim2.new(1,-4,0,24),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
+        Size=UDim2.new(1,-4,0,IS_MOBILE and 19 or 24),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
     Rnd(999,fr); Bdr(fr,C.IrisDim,1,0.55)
     Grad(fr,ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.new(1,1,1)),
         ColorSequenceKeypoint.new(1,Color3.fromRGB(25,5,55))}),
@@ -988,7 +989,7 @@ local function CreateToggle(parent, labelText, enabledKey, callback, order)
     local row = N("Frame",{BackgroundColor3=C.Surface,BackgroundTransparency=0.6,
         Size=UDim2.new(1,-4,0,ROW_TOGGLE_H),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
     Rnd(999,row); Bdr(row,C.Lift,1,0.5)
-    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=IS_MOBILE and 12 or 11,
+    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=IS_MOBILE and 10 or 11,
         TextColor3=C.TextMid,BackgroundTransparency=1,Size=UDim2.new(1,-56,1,0),
         Position=UDim2.new(0,14,0,0),TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,Parent=row})
     local track = N("Frame",{BackgroundColor3=on and C.IrisDim or C.Void,
@@ -1023,16 +1024,16 @@ local function CreateSlider(parent, labelText, minVal, maxVal, valueKey, callbac
     local row = N("Frame",{BackgroundColor3=C.Surface,BackgroundTransparency=0.6,
         Size=UDim2.new(1,-4,0,ROW_SLIDER_H),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
     Rnd(999,row); Bdr(row,C.Lift,1,0.5)
-    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=IS_MOBILE and 12 or 11,TextColor3=C.TextMid,
+    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=IS_MOBILE and 10 or 11,TextColor3=C.TextMid,
         BackgroundTransparency=1,Size=UDim2.new(1,-56,0,18),Position=UDim2.new(0,14,0,5),
         TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,Parent=row})
     local valLbl = N("TextLabel",{Text=tostring(val),Font=Enum.Font.GothamBold,
-        TextSize=IS_MOBILE and 12 or 11,TextColor3=C.Iris,BackgroundTransparency=1,
+        TextSize=IS_MOBILE and 10 or 11,TextColor3=C.Iris,BackgroundTransparency=1,
         Size=UDim2.new(0,44,0,18),Position=UDim2.new(1,-52,0,5),
         TextXAlignment=Enum.TextXAlignment.Right,ZIndex=8,Parent=row})
-    local trackY = IS_MOBILE and 34 or 32
+    local trackY = IS_MOBILE and 28 or 32
     local track = N("Frame",{BackgroundColor3=C.Void,
-        Size=UDim2.new(1,-24,0,IS_MOBILE and 6 or 5),
+        Size=UDim2.new(1,-24,0,IS_MOBILE and 5 or 5),
         Position=UDim2.new(0,12,0,trackY),ZIndex=8,Parent=row})
     Rnd(999,track); Bdr(track,C.Lift,1,0.6)
     local pct  = (val-minVal)/(maxVal-minVal)
@@ -1073,8 +1074,8 @@ local function CreateSlider(parent, labelText, minVal, maxVal, valueKey, callbac
 end
 
 -- ── Progress bar ───────────────────────────────────────────
-local pbar = N("Frame",{Size=UDim2.new(0,PBAR_W,0,44),
-    Position=UDim2.new(0.5,-PBAR_W/2,1,-110),
+local pbar = N("Frame",{Size=UDim2.new(0,PBAR_W,0,IS_MOBILE and 34 or 44),
+    Position=UDim2.new(0.5,-PBAR_W/2,1,IS_MOBILE and -80 or -110),
     BackgroundColor3=C.Panel,BorderSizePixel=0,ZIndex=10,Parent=Gui})
 Rnd(14,pbar)
 local pStroke = Bdr(pbar,C.Iris,2.5,0)
@@ -1092,13 +1093,13 @@ task.spawn(function()
 end)
 ProgressLabel = N("TextLabel",{Size=UDim2.new(0.55,0,1,0),Position=UDim2.new(0,14,0,0),
     BackgroundTransparency=1,Text="READY",TextColor3=C.White,
-    Font=Enum.Font.GothamBold,TextSize=14,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=12,Parent=pbar})
+    Font=Enum.Font.GothamBold,TextSize=IS_MOBILE and 10 or 14,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=12,Parent=pbar})
 ProgressPercentLabel = N("TextLabel",{Size=UDim2.new(0.4,0,1,0),Position=UDim2.new(0.3,0,0,0),
     BackgroundTransparency=1,Text="",TextColor3=C.IrisBright,
-    Font=Enum.Font.GothamBlack,TextSize=13,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=12,Parent=pbar})
+    Font=Enum.Font.GothamBlack,TextSize=IS_MOBILE and 10 or 13,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=12,Parent=pbar})
 local statRadius = N("TextLabel",{Size=UDim2.new(0,38,1,0),Position=UDim2.new(1,-44,0,0),
     BackgroundTransparency=1,Text=tostring(Values.STEAL_RADIUS),TextColor3=C.Iris,
-    Font=Enum.Font.GothamBold,TextSize=13,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=12,Parent=pbar})
+    Font=Enum.Font.GothamBold,TextSize=IS_MOBILE and 10 or 13,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=12,Parent=pbar})
 local pTrack = N("Frame",{Size=UDim2.new(1,-16,0,4),Position=UDim2.new(0,8,1,-7),
     BackgroundColor3=C.Void,BorderSizePixel=0,ZIndex=11,Parent=pbar})
 Rnd(999,pTrack)
@@ -1110,7 +1111,7 @@ Grad(ProgressBarFill,ColorSequence.new({
 RunService.Heartbeat:Connect(function() statRadius.Text=tostring(Values.STEAL_RADIUS) end)
 
 -- ── OD floating logo / hide button ─────────────────────────
-local chSize = 48
+local chSize = IS_MOBILE and 36 or 48
 -- Logo goes above panel on PC; left of the panel on mobile (stays away from joystick)
 local chInitPos = IS_MOBILE
     and UDim2.new(1,-(PANEL_W+10+chSize+6), 0.5, -(PANEL_H/2)-chSize/2)
