@@ -1,0 +1,1404 @@
+-- ============================================================
+--  ORBIT — DUELS
+--  All features from Chiron Duels, rebuilt inside Orbit Hub UI
+-- ============================================================
+
+local CoreGui          = game:GetService("CoreGui")
+local Players          = game:GetService("Players")
+local RunService       = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService     = game:GetService("TweenService")
+local Lighting         = game:GetService("Lighting")
+local Stats_s          = game:GetService("Stats")
+local Player           = Players.LocalPlayer
+
+local function waitForCharacter()
+    local char = Player.Character
+    if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") then
+        return char
+    end
+    return Player.CharacterAdded:Wait()
+end
+task.spawn(waitForCharacter)
+
+if not getgenv then getgenv = function() return _G end end
+
+-- ── Feature flags ──────────────────────────────────────────
+local Enabled = {
+    SpeedBoost         = false,
+    AntiRagdoll        = false,
+    HitCircle          = false,
+    Float              = false,
+    SpeedWhileStealing = false,
+    AutoSteal          = false,
+    Unwalk             = false,
+    OptimizerXRay      = false,
+    SpamBat            = false,
+    Helicopter         = false,
+    Vibrance           = false,
+    AutoRight          = false,
+    AutoLeft           = false,
+    GalaxyMode         = false,
+    BatAimbot          = false,
+}
+
+local Values = {
+    BoostSpeed           = 30,
+    SpinSpeed            = 30,
+    StealingSpeedValue   = 29,
+    STEAL_RADIUS         = 20,
+    STEAL_DURATION       = 1.3,
+    DEFAULT_GRAVITY      = 196.2,
+    GalaxyGravityPercent = 70,
+    HOP_POWER            = 35,
+    HOP_COOLDOWN         = 0.08,
+    BatAimbotSpeed       = 55,
+}
+
+local KEYBINDS = {
+    SPEED     = Enum.KeyCode.V,
+    FLOAT     = Enum.KeyCode.F,
+    AUTORIGHT = Enum.KeyCode.E,
+    AUTOLEFT  = Enum.KeyCode.Q,
+    BATAIMBOT = Enum.KeyCode.X,
+}
+
+local Connections        = {}
+local isStealing         = false
+local lastBatSwing       = 0
+local BAT_SWING_COOLDOWN = 0.12
+
+-- ── Helpers ────────────────────────────────────────────────
+local function getMovementDirection()
+    local c = Player.Character
+    if not c then return Vector3.zero end
+    local hum = c:FindFirstChildOfClass("Humanoid")
+    return hum and hum.MoveDirection or Vector3.zero
+end
+
+local SlapList = {
+    {1,"Bat"},{2,"Slap"},{3,"Iron Slap"},{4,"Gold Slap"},
+    {5,"Diamond Slap"},{6,"Emerald Slap"},{7,"Ruby Slap"},
+    {8,"Dark Matter Slap"},{9,"Flame Slap"},{10,"Nuclear Slap"},
+    {11,"Galaxy Slap"},{12,"Glitched Slap"}
+}
+
+local function findBat()
+    local c  = Player.Character
+    if not c then return nil end
+    local bp = Player:FindFirstChildOfClass("Backpack")
+    for _, ch in ipairs(c:GetChildren()) do
+        if ch:IsA("Tool") and ch.Name:lower():find("bat") then return ch end
+    end
+    if bp then
+        for _, ch in ipairs(bp:GetChildren()) do
+            if ch:IsA("Tool") and ch.Name:lower():find("bat") then return ch end
+        end
+    end
+    for _, i in ipairs(SlapList) do
+        local t = c:FindFirstChild(i[2]) or (bp and bp:FindFirstChild(i[2]))
+        if t then return t end
+    end
+    return nil
+end
+
+-- ============================================================
+--  FEATURE LOGIC
+-- ============================================================
+
+-- Speed Boost
+local function startSpeedBoost()
+    if Connections.speed then return end
+    Connections.speed = RunService.Heartbeat:Connect(function()
+        if not Enabled.SpeedBoost then return end
+        pcall(function()
+            local c = Player.Character; if not c then return end
+            local h = c:FindFirstChild("HumanoidRootPart"); if not h then return end
+            local md = getMovementDirection()
+            if md.Magnitude > 0.1 then
+                h.AssemblyLinearVelocity = Vector3.new(md.X*Values.BoostSpeed, h.AssemblyLinearVelocity.Y, md.Z*Values.BoostSpeed)
+            end
+        end)
+    end)
+end
+local function stopSpeedBoost()
+    if Connections.speed then Connections.speed:Disconnect(); Connections.speed = nil end
+end
+
+-- Speed While Stealing
+local function startSpeedWhileStealing()
+    if Connections.speedWhileStealing then return end
+    Connections.speedWhileStealing = RunService.Heartbeat:Connect(function()
+        if not Enabled.SpeedWhileStealing or not Player:GetAttribute("Stealing") then return end
+        local c = Player.Character; if not c then return end
+        local h = c:FindFirstChild("HumanoidRootPart"); if not h then return end
+        local md = getMovementDirection()
+        if md.Magnitude > 0.1 then
+            h.AssemblyLinearVelocity = Vector3.new(md.X*Values.StealingSpeedValue, h.AssemblyLinearVelocity.Y, md.Z*Values.StealingSpeedValue)
+        end
+    end)
+end
+local function stopSpeedWhileStealing()
+    if Connections.speedWhileStealing then Connections.speedWhileStealing:Disconnect(); Connections.speedWhileStealing = nil end
+end
+
+-- Anti Ragdoll
+local antiRagdollMode  = nil
+local ragdollConns     = {}
+local cachedCharData   = {}
+local isBoosting       = false
+local AR_BOOST_SPEED   = 400
+local AR_DEFAULT_SPEED = 16
+
+local function arCacheChar()
+    local char = Player.Character; if not char then return false end
+    local hum  = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return false end
+    cachedCharData = {character=char, humanoid=hum, root=root}
+    return true
+end
+local function arDisconnectAll()
+    for _, c in ipairs(ragdollConns) do pcall(function() c:Disconnect() end) end
+    ragdollConns = {}
+end
+local function arIsRagdolled()
+    if not cachedCharData.humanoid then return false end
+    local s = cachedCharData.humanoid:GetState()
+    if s==Enum.HumanoidStateType.Physics or s==Enum.HumanoidStateType.Ragdoll or s==Enum.HumanoidStateType.FallingDown then return true end
+    local et = Player:GetAttribute("RagdollEndTime")
+    if et and (et - workspace:GetServerTimeNow()) > 0 then return true end
+    return false
+end
+local function arForceExit()
+    if not cachedCharData.humanoid or not cachedCharData.root then return end
+    pcall(function() Player:SetAttribute("RagdollEndTime", workspace:GetServerTimeNow()) end)
+    for _, d in ipairs(cachedCharData.character:GetDescendants()) do
+        if d:IsA("BallSocketConstraint") or (d:IsA("Attachment") and d.Name:find("RagdollAttachment")) then d:Destroy() end
+    end
+    if not isBoosting then isBoosting=true; cachedCharData.humanoid.WalkSpeed=AR_BOOST_SPEED end
+    if cachedCharData.humanoid.Health > 0 then cachedCharData.humanoid:ChangeState(Enum.HumanoidStateType.Running) end
+    cachedCharData.root.Anchored = false
+end
+local function arLoop()
+    while antiRagdollMode == "v1" do
+        task.wait()
+        if not Enabled.AntiRagdoll then break end
+        if arIsRagdolled() then arForceExit()
+        elseif isBoosting then isBoosting=false; if cachedCharData.humanoid then cachedCharData.humanoid.WalkSpeed=AR_DEFAULT_SPEED end end
+    end
+end
+local function startAntiRagdoll()
+    if antiRagdollMode == "v1" then return end
+    if not arCacheChar() then return end
+    antiRagdollMode = "v1"
+    table.insert(ragdollConns, RunService.RenderStepped:Connect(function()
+        local cam = workspace.CurrentCamera
+        if cam and cachedCharData.humanoid then cam.CameraSubject = cachedCharData.humanoid end
+    end))
+    table.insert(ragdollConns, Player.CharacterAdded:Connect(function()
+        isBoosting = false; task.wait(0.5); arCacheChar()
+    end))
+    task.spawn(arLoop)
+end
+local function stopAntiRagdoll()
+    antiRagdollMode = nil
+    if isBoosting and cachedCharData.humanoid then cachedCharData.humanoid.WalkSpeed=AR_DEFAULT_SPEED end
+    isBoosting = false; arDisconnectAll(); cachedCharData = {}
+end
+
+-- Spam Bat
+local function startSpamBat()
+    if Connections.spamBat then return end
+    Connections.spamBat = RunService.Heartbeat:Connect(function()
+        if not Enabled.SpamBat then return end
+        local c = Player.Character; if not c then return end
+        local bat = findBat(); if not bat then return end
+        if bat.Parent ~= c then bat.Parent = c end
+        local now = tick()
+        if now - lastBatSwing < BAT_SWING_COOLDOWN then return end
+        lastBatSwing = now
+        pcall(function() bat:Activate() end)
+    end)
+end
+local function stopSpamBat()
+    if Connections.spamBat then Connections.spamBat:Disconnect(); Connections.spamBat = nil end
+end
+
+-- Helicopter / Spin Bot
+local helicopterBAV = nil
+local function startHelicopter()
+    local c = Player.Character; if not c then return end
+    local hrp = c:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+    if helicopterBAV then helicopterBAV:Destroy(); helicopterBAV = nil end
+    helicopterBAV = Instance.new("BodyAngularVelocity")
+    helicopterBAV.Name = "HelicopterBAV"
+    helicopterBAV.MaxTorque = Vector3.new(0, math.huge, 0)
+    helicopterBAV.AngularVelocity = Vector3.new(0, Values.SpinSpeed, 0)
+    helicopterBAV.Parent = hrp
+end
+local function stopHelicopter()
+    if helicopterBAV then helicopterBAV:Destroy(); helicopterBAV = nil end
+    local c = Player.Character
+    if c then
+        local hrp = c:FindFirstChild("HumanoidRootPart")
+        if hrp then for _, v in pairs(hrp:GetChildren()) do if v.Name=="HelicopterBAV" then v:Destroy() end end end
+    end
+end
+
+-- Float
+local floatConn = nil
+local FLOAT_TARGET_HEIGHT = 10
+local function startFloat()
+    if floatConn then return end
+    local c = Player.Character; if not c then return end
+    local hrp = c:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+    local floatOriginY   = hrp.Position.Y + FLOAT_TARGET_HEIGHT
+    local floatStartTime = tick()
+    local floatDesc      = false
+    floatConn = RunService.Heartbeat:Connect(function()
+        if not Enabled.Float then return end
+        local c2 = Player.Character; if not c2 then return end
+        local h  = c2:FindFirstChild("HumanoidRootPart"); if not h then return end
+        local hm = c2:FindFirstChildOfClass("Humanoid")
+        local md = hm and hm.MoveDirection or Vector3.zero
+        if tick()-floatStartTime >= 4 then floatDesc = true end
+        local cy, vertVel = h.Position.Y, 0
+        if floatDesc then
+            vertVel = -20
+            if cy <= floatOriginY-FLOAT_TARGET_HEIGHT+0.5 then
+                h.AssemblyLinearVelocity = Vector3.zero
+                Enabled.Float = false
+                if floatConn then floatConn:Disconnect(); floatConn = nil end
+                return
+            end
+        else
+            local diff = floatOriginY - cy
+            if diff > 0.3 then vertVel = math.clamp(diff*8,5,50)
+            elseif diff < -0.3 then vertVel = math.clamp(diff*8,-50,-5) end
+        end
+        local hx = md.Magnitude>0.1 and md.X*Values.BoostSpeed or 0
+        local hz = md.Magnitude>0.1 and md.Z*Values.BoostSpeed or 0
+        h.AssemblyLinearVelocity = Vector3.new(hx, vertVel, hz)
+    end)
+end
+local function stopFloat()
+    if floatConn then floatConn:Disconnect(); floatConn = nil end
+    local c = Player.Character
+    if c then local h=c:FindFirstChild("HumanoidRootPart"); if h then h.AssemblyLinearVelocity=Vector3.zero end end
+end
+
+-- Unwalk
+local savedAnims = {}
+local function startUnwalk()
+    local c = Player.Character; if not c then return end
+    local hum = c:FindFirstChildOfClass("Humanoid")
+    if hum then for _, t in ipairs(hum:GetPlayingAnimationTracks()) do t:Stop() end end
+    local anim = c:FindFirstChild("Animate")
+    if anim then savedAnims.Animate = anim:Clone(); anim:Destroy() end
+end
+local function stopUnwalk()
+    local c = Player.Character
+    if c and savedAnims.Animate then savedAnims.Animate:Clone().Parent = c; savedAnims.Animate = nil end
+end
+
+-- Hit Circle
+local Cebo = {Conn=nil, Circle=nil, Align=nil, Attach=nil}
+local function startHitCircle()
+    if Cebo.Conn then return end
+    local char = Player.Character or Player.CharacterAdded:Wait()
+    local hrp  = char:WaitForChild("HumanoidRootPart")
+    Cebo.Attach = Instance.new("Attachment", hrp)
+    Cebo.Align  = Instance.new("AlignOrientation", hrp)
+    Cebo.Align.Attachment0 = Cebo.Attach
+    Cebo.Align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    Cebo.Align.RigidityEnabled = true
+    Cebo.Circle = Instance.new("Part")
+    Cebo.Circle.Shape      = Enum.PartType.Cylinder
+    Cebo.Circle.Material   = Enum.Material.Neon
+    Cebo.Circle.Size       = Vector3.new(0.05, 14.5, 14.5)
+    Cebo.Circle.Color      = Color3.fromRGB(148, 58, 255)
+    Cebo.Circle.CanCollide = false
+    Cebo.Circle.Massless   = true
+    Cebo.Circle.Parent     = workspace
+    local weld = Instance.new("Weld")
+    weld.Part0  = hrp; weld.Part1 = Cebo.Circle
+    weld.C0     = CFrame.new(0,-1,0)*CFrame.Angles(0,0,math.rad(90))
+    weld.Parent = Cebo.Circle
+    Cebo.Conn = RunService.RenderStepped:Connect(function()
+        if not Enabled.HitCircle then return end
+        local target, dmin = nil, 7.25
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p~=Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (p.Character.HumanoidRootPart.Position-hrp.Position).Magnitude
+                if d<=dmin then target,dmin=p.Character.HumanoidRootPart,d end
+            end
+        end
+        if target then
+            char.Humanoid.AutoRotate = false
+            Cebo.Align.Enabled = true
+            Cebo.Align.CFrame  = CFrame.lookAt(hrp.Position, Vector3.new(target.Position.X,hrp.Position.Y,target.Position.Z))
+            local t = char:FindFirstChild("Bat") or char:FindFirstChild("Medusa")
+            if t then t:Activate() end
+        else
+            Cebo.Align.Enabled = false
+            char.Humanoid.AutoRotate = true
+        end
+    end)
+end
+local function stopHitCircle()
+    if Cebo.Conn   then Cebo.Conn:Disconnect();   Cebo.Conn   = nil end
+    if Cebo.Circle then Cebo.Circle:Destroy();     Cebo.Circle = nil end
+    if Cebo.Align  then Cebo.Align:Destroy();      Cebo.Align  = nil end
+    if Cebo.Attach then Cebo.Attach:Destroy();     Cebo.Attach = nil end
+    if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+        Player.Character.Humanoid.AutoRotate = true
+    end
+end
+
+-- Bat Aimbot
+local function findNearestEnemy(myHRP)
+    local nearest, nDist, nTorso = nil, math.huge, nil
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p~=Player and p.Character then
+            local eh    = p.Character:FindFirstChild("HumanoidRootPart")
+            local torso = p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso")
+            local hum   = p.Character:FindFirstChildOfClass("Humanoid")
+            if eh and hum and hum.Health>0 then
+                local d = (eh.Position-myHRP.Position).Magnitude
+                if d < nDist then nDist=d; nearest=eh; nTorso=torso or eh end
+            end
+        end
+    end
+    return nearest, nDist, nTorso
+end
+local function startBatAimbot()
+    if Connections.batAimbot then return end
+    Connections.batAimbot = RunService.Heartbeat:Connect(function()
+        if not Enabled.BatAimbot then return end
+        local c = Player.Character; if not c then return end
+        local h   = c:FindFirstChild("HumanoidRootPart")
+        local hum = c:FindFirstChildOfClass("Humanoid")
+        if not h or not hum then return end
+        local bat = findBat()
+        if bat and bat.Parent~=c then pcall(function() hum:EquipTool(bat) end) end
+        local target, _, torso = findNearestEnemy(h)
+        if target and torso then
+            local dir  = torso.Position - h.Position
+            local flat = Vector3.new(dir.X,0,dir.Z)
+            local spd  = Values.BatAimbotSpeed
+            if flat.Magnitude > 1.5 then
+                local md = flat.Unit
+                h.AssemblyLinearVelocity = Vector3.new(md.X*spd, h.AssemblyLinearVelocity.Y, md.Z*spd)
+            else
+                local tv = target.AssemblyLinearVelocity
+                h.AssemblyLinearVelocity = Vector3.new(tv.X, h.AssemblyLinearVelocity.Y, tv.Z)
+            end
+        end
+    end)
+end
+local function stopBatAimbot()
+    if Connections.batAimbot then Connections.batAimbot:Disconnect(); Connections.batAimbot = nil end
+end
+
+-- Galaxy / Gravity Mode
+local galaxyEnabled     = false
+local galaxyHops        = false
+local galaxyLastHop     = 0
+local galaxySpaceHeld   = false
+local galaxyOrigJump    = 50
+local galaxyForce       = nil
+local galaxyAttach      = nil
+
+local function galaxyCaptureJump()
+    local c = Player.Character; if not c then return end
+    local h = c:FindFirstChildOfClass("Humanoid")
+    if h and h.JumpPower > 0 then galaxyOrigJump = h.JumpPower end
+end
+task.spawn(function() task.wait(1); galaxyCaptureJump() end)
+Player.CharacterAdded:Connect(function() task.wait(1); galaxyCaptureJump() end)
+
+local function galaxySetupForce()
+    pcall(function()
+        local c = Player.Character; if not c then return end
+        local h = c:FindFirstChild("HumanoidRootPart"); if not h then return end
+        if galaxyForce  then galaxyForce:Destroy()  end
+        if galaxyAttach then galaxyAttach:Destroy() end
+        galaxyAttach = Instance.new("Attachment"); galaxyAttach.Parent = h
+        galaxyForce  = Instance.new("VectorForce")
+        galaxyForce.Attachment0          = galaxyAttach
+        galaxyForce.ApplyAtCenterOfMass  = true
+        galaxyForce.RelativeTo           = Enum.ActuatorRelativeTo.World
+        galaxyForce.Force                = Vector3.zero
+        galaxyForce.Parent               = h
+    end)
+end
+local function galaxyUpdateForce()
+    if not galaxyEnabled or not galaxyForce then return end
+    local c = Player.Character; if not c then return end
+    local mass = 0
+    for _, p in ipairs(c:GetDescendants()) do if p:IsA("BasePart") then mass += p:GetMass() end end
+    local tg = Values.DEFAULT_GRAVITY*(Values.GalaxyGravityPercent/100)
+    galaxyForce.Force = Vector3.new(0, mass*(Values.DEFAULT_GRAVITY-tg)*0.95, 0)
+end
+local function galaxyAdjustJump()
+    pcall(function()
+        local c = Player.Character; if not c then return end
+        local h = c:FindFirstChildOfClass("Humanoid"); if not h then return end
+        if not galaxyEnabled then h.JumpPower = galaxyOrigJump; return end
+        local ratio = math.sqrt((Values.DEFAULT_GRAVITY*(Values.GalaxyGravityPercent/100))/Values.DEFAULT_GRAVITY)
+        h.JumpPower = galaxyOrigJump * ratio
+    end)
+end
+local function galaxyDoHop()
+    if not galaxyHops then return end
+    pcall(function()
+        local c = Player.Character; if not c then return end
+        local h = c:FindFirstChild("HumanoidRootPart")
+        local hm = c:FindFirstChildOfClass("Humanoid"); if not h or not hm then return end
+        if tick()-galaxyLastHop < Values.HOP_COOLDOWN then return end
+        galaxyLastHop = tick()
+        if hm.FloorMaterial == Enum.Material.Air then
+            h.AssemblyLinearVelocity = Vector3.new(h.AssemblyLinearVelocity.X, Values.HOP_POWER, h.AssemblyLinearVelocity.Z)
+        end
+    end)
+end
+local function startGalaxyMode()
+    galaxyEnabled = true; galaxyHops = true
+    galaxySetupForce(); galaxyAdjustJump()
+end
+local function stopGalaxyMode()
+    galaxyEnabled = false; galaxyHops = false
+    if galaxyForce  then galaxyForce:Destroy();  galaxyForce  = nil end
+    if galaxyAttach then galaxyAttach:Destroy(); galaxyAttach = nil end
+    galaxyAdjustJump()
+end
+
+RunService.Heartbeat:Connect(function()
+    if galaxyHops and galaxySpaceHeld then galaxyDoHop() end
+    if galaxyEnabled then galaxyUpdateForce() end
+end)
+UserInputService.InputBegan:Connect(function(i, gpe)
+    if not gpe and i.KeyCode == Enum.KeyCode.Space then galaxySpaceHeld = true end
+end)
+UserInputService.InputEnded:Connect(function(i)
+    if i.KeyCode == Enum.KeyCode.Space then galaxySpaceHeld = false end
+end)
+Player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if galaxyEnabled then galaxySetupForce(); galaxyAdjustJump() end
+end)
+
+-- Optimizer + XRay
+local origTransparency = {}
+local function enableOptimizer()
+    if getgenv and getgenv().OPTIMIZER_ACTIVE then return end
+    if getgenv then getgenv().OPTIMIZER_ACTIVE = true end
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+        Lighting.GlobalShadows = false; Lighting.Brightness = 3; Lighting.FogEnd = 9e9
+    end)
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") then obj:Destroy()
+                elseif obj:IsA("BasePart") then obj.CastShadow=false; obj.Material=Enum.Material.Plastic end
+            end)
+        end
+    end)
+end
+local function disableOptimizer()
+    if getgenv then getgenv().OPTIMIZER_ACTIVE = false end
+end
+local function enableXRay()
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Anchored and
+               (obj.Name:lower():find("base") or (obj.Parent and obj.Parent.Name:lower():find("base"))) then
+                origTransparency[obj] = obj.LocalTransparencyModifier
+                obj.LocalTransparencyModifier = 0.85
+            end
+        end
+    end)
+end
+local function disableXRay()
+    for part, val in pairs(origTransparency) do if part then part.LocalTransparencyModifier = val end end
+    origTransparency = {}
+end
+
+
+
+-- Auto Steal
+local StealData    = {}
+local stealStart   = nil
+local progressConn = nil
+local ProgressBarFill, ProgressLabel, ProgressPercentLabel
+
+local function isMyPlot(pn)
+    local plots = workspace:FindFirstChild("Plots"); if not plots then return false end
+    local plot  = plots:FindFirstChild(pn); if not plot then return false end
+    local sign  = plot:FindFirstChild("PlotSign")
+    if sign then
+        local yb = sign:FindFirstChild("YourBase")
+        if yb and yb:IsA("BillboardGui") then return yb.Enabled end
+    end
+    return false
+end
+local function findNearestPrompt()
+    local h = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if not h then return nil end
+    local plots = workspace:FindFirstChild("Plots"); if not plots then return nil end
+    local np, nd, nn = nil, math.huge, nil
+    for _, plot in ipairs(plots:GetChildren()) do
+        if isMyPlot(plot.Name) then continue end
+        local pods = plot:FindFirstChild("AnimalPodiums"); if not pods then continue end
+        for _, pod in ipairs(pods:GetChildren()) do
+            pcall(function()
+                local base  = pod:FindFirstChild("Base")
+                local spawn = base and base:FindFirstChild("Spawn")
+                if spawn then
+                    local dist = (spawn.Position-h.Position).Magnitude
+                    if dist<nd and dist<=Values.STEAL_RADIUS then
+                        local att = spawn:FindFirstChild("PromptAttachment")
+                        if att then
+                            for _, ch in ipairs(att:GetChildren()) do
+                                if ch:IsA("ProximityPrompt") then np,nd,nn=ch,dist,pod.Name; break end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+    return np, nd, nn
+end
+local function ResetProgressBar()
+    if ProgressLabel       then ProgressLabel.Text = "READY" end
+    if ProgressPercentLabel then ProgressPercentLabel.Text = "" end
+    if ProgressBarFill     then ProgressBarFill.Size = UDim2.new(0,0,1,0) end
+end
+local ORBIT_TEXT = "Orbit  Duels"
+local function getOrbitProgress(pct)
+    local total = #ORBIT_TEXT
+    local chars = math.floor(math.min(pct*1.5,100)/100*total)
+    return string.sub(ORBIT_TEXT,1,chars)
+end
+local function executeSteal(prompt, name)
+    if isStealing then return end
+    if not StealData[prompt] then
+        StealData[prompt] = {hold={}, trigger={}, ready=true}
+        pcall(function()
+            if getconnections then
+                for _, c in ipairs(getconnections(prompt.PromptButtonHoldBegan)) do
+                    if c.Function then table.insert(StealData[prompt].hold, c.Function) end
+                end
+                for _, c in ipairs(getconnections(prompt.Triggered)) do
+                    if c.Function then table.insert(StealData[prompt].trigger, c.Function) end
+                end
+            end
+        end)
+    end
+    local data = StealData[prompt]
+    if not data.ready then return end
+    data.ready = false; isStealing = true; stealStart = tick()
+    if ProgressLabel then ProgressLabel.Text = name or "STEALING..." end
+    if progressConn  then progressConn:Disconnect() end
+    progressConn = RunService.Heartbeat:Connect(function()
+        if not isStealing then progressConn:Disconnect(); return end
+        local prog = math.clamp((tick()-stealStart)/Values.STEAL_DURATION,0,1)
+        if ProgressBarFill     then ProgressBarFill.Size = UDim2.new(prog,0,1,0) end
+        if ProgressPercentLabel then ProgressPercentLabel.Text = getOrbitProgress(math.floor(prog*100)) end
+    end)
+    task.spawn(function()
+        for _, f in ipairs(data.hold) do task.spawn(f) end
+        task.wait(Values.STEAL_DURATION)
+        for _, f in ipairs(data.trigger) do task.spawn(f) end
+        if progressConn then progressConn:Disconnect() end
+        ResetProgressBar(); data.ready = true; isStealing = false
+    end)
+end
+local function startAutoSteal()
+    if Connections.autoSteal then return end
+    Connections.autoSteal = RunService.Heartbeat:Connect(function()
+        if not Enabled.AutoSteal or isStealing then return end
+        local p,_,n = findNearestPrompt()
+        if p then executeSteal(p,n) end
+    end)
+end
+local function stopAutoSteal()
+    if Connections.autoSteal then Connections.autoSteal:Disconnect(); Connections.autoSteal=nil end
+    isStealing = false; ResetProgressBar()
+end
+
+-- Steal Paths
+local stealPathActive       = false
+local stealLastFlatVel      = Vector3.zero
+local SP_FAST               = 59.2
+local SP_SLOW               = 29.6
+local SP_STOP_BASE          = 1.35
+local SP_STOP_MIN           = 0.65
+local SP_BIAS               = 0.45
+local SP_SMOOTH             = 0.12
+
+local stealPath_Right = {
+    {pos=Vector3.new(-470.6,-5.9,34.4)},
+    {pos=Vector3.new(-484.2,-3.9,21.4)},
+    {pos=Vector3.new(-475.6,-5.8,29.3)},
+    {pos=Vector3.new(-473.4,-5.9,111)}
+}
+local stealPath_Left = {
+    {pos=Vector3.new(-474.7,-5.9,91.0)},
+    {pos=Vector3.new(-483.4,-3.9,97.3)},
+    {pos=Vector3.new(-474.7,-5.9,91.0)},
+    {pos=Vector3.new(-476.1,-5.5,25.4)}
+}
+local function stealMoveToPoint(hrp, cur, nxt, spd)
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if not stealPathActive then conn:Disconnect(); hrp.AssemblyLinearVelocity=Vector3.zero; return end
+        local pos    = hrp.Position
+        local target = Vector3.new(cur.X,pos.Y,cur.Z)
+        local dir    = target - pos
+        local dist   = dir.Magnitude
+        local stopD  = math.clamp(SP_STOP_BASE-dist*0.04, SP_STOP_MIN, SP_STOP_BASE)
+        if dist <= stopD then conn:Disconnect(); hrp.AssemblyLinearVelocity=Vector3.zero; return end
+        local md = dir.Unit
+        if nxt then
+            local nd = (Vector3.new(nxt.X,pos.Y,nxt.Z)-pos).Unit
+            md = (md + nd*SP_BIAS).Unit
+        end
+        if stealLastFlatVel.Magnitude > 0.1 then
+            md = (md*(1-SP_SMOOTH) + stealLastFlatVel.Unit*SP_SMOOTH).Unit
+        end
+        local vel = Vector3.new(md.X*spd, hrp.AssemblyLinearVelocity.Y, md.Z*spd)
+        hrp.AssemblyLinearVelocity = vel
+        stealLastFlatVel = Vector3.new(vel.X,0,vel.Z)
+    end)
+    while stealPathActive and
+        (Vector3.new(hrp.Position.X,0,hrp.Position.Z)-Vector3.new(cur.X,0,cur.Z)).Magnitude > SP_STOP_BASE do
+        RunService.Heartbeat:Wait()
+    end
+end
+local function stealRunPath(path)
+    local hrp = (Player.Character or Player.CharacterAdded:Wait()):WaitForChild("HumanoidRootPart")
+    for i, p in ipairs(path) do
+        if not stealPathActive then return end
+        local spd  = i>2 and SP_SLOW or SP_FAST
+        local nxtP = path[i+1] and path[i+1].pos
+        stealMoveToPoint(hrp, p.pos, nxtP, spd)
+        if i==2 then task.wait(0.2) else task.wait(0.01) end
+    end
+end
+local function startStealPath(path)
+    stealPathActive = true
+    task.spawn(function()
+        while stealPathActive do stealRunPath(path); task.wait(0.1) end
+    end)
+end
+local function stopStealPath()
+    stealPathActive = false
+    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then hrp.AssemblyLinearVelocity = Vector3.zero end
+end
+
+-- ============================================================
+--  GUI CONSTRUCTION  —  Orbit colours, single-column layout
+-- ============================================================
+pcall(function()
+    for _, v in ipairs(CoreGui:GetChildren()) do
+        if v.Name=="OrbitDuels" then v:Destroy() end
+    end
+end)
+
+local Gui = Instance.new("ScreenGui")
+Gui.Name          = "OrbitDuels"
+Gui.ResetOnSpawn  = false
+Gui.DisplayOrder  = 999
+pcall(function() Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling end)
+pcall(function()
+    local ok, syn = pcall(function() return syn end)
+    if ok and syn and type(syn.protect_gui)=="function" then
+        pcall(function() syn.protect_gui(Gui) end)
+    end
+    Gui.Parent = CoreGui
+end)
+if not Gui.Parent then Gui.Parent = Player.PlayerGui end
+
+-- Orbit colour palette (purple / void)
+local C = {
+    Void       = Color3.fromRGB(4,2,10),
+    Deep       = Color3.fromRGB(8,4,18),
+    Panel      = Color3.fromRGB(12,5,26),
+    Surface    = Color3.fromRGB(20,8,40),
+    Lift       = Color3.fromRGB(30,12,60),
+    Iris       = Color3.fromRGB(148,58,255),
+    IrisBright = Color3.fromRGB(190,100,255),
+    IrisDim    = Color3.fromRGB(80,20,160),
+    IrisDark   = Color3.fromRGB(30,6,70),
+    TextMid    = Color3.fromRGB(160,130,200),
+    TextLow    = Color3.fromRGB(88,68,128),
+    White      = Color3.fromRGB(255,255,255),
+    DangerDark = Color3.fromRGB(48,8,18),
+    DangerMid  = Color3.fromRGB(180,35,60),
+    Green      = Color3.fromRGB(80,255,160),
+}
+
+local PANEL_W  = 230
+local PANEL_H  = 480
+local BANNER_H = 46
+local PBAR_W   = 310
+local TI       = TweenInfo.new
+
+-- Utility builders (Orbit style)
+local function N(cls, props, children)
+    local inst = Instance.new(cls)
+    for k,v in pairs(props or {}) do if k~="Parent" then pcall(function() inst[k]=v end) end end
+    for _, ch in ipairs(children or {}) do ch.Parent = inst end
+    if props and props.Parent then inst.Parent = props.Parent end
+    return inst
+end
+local function Tw(o,t,p)  TweenService:Create(o,t,p):Play() end
+local function Rnd(r,p)   N("UICorner",{CornerRadius=UDim.new(0,r),Parent=p}) end
+local function Bdr(p,c,th,tr)
+    return N("UIStroke",{Color=c,Thickness=th or 1,Transparency=tr or 0,Parent=p})
+end
+local function Grad(p,c,tr,rot)
+    local g = N("UIGradient",{Parent=p})
+    if c   then g.Color        = c   end
+    if tr  then g.Transparency = tr  end
+    if rot then g.Rotation     = rot end
+    return g
+end
+
+-- ── FPS / Ping island ──────────────────────────────────────
+local Island = N("Frame",{BackgroundColor3=C.Panel,Size=UDim2.new(0,200,0,28),
+    Position=UDim2.new(0.5,-100,0,6),ZIndex=500,Parent=Gui})
+Rnd(14,Island); Bdr(Island,C.Iris,1,0.3)
+Grad(Island,ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.fromRGB(18,6,38)),
+    ColorSequenceKeypoint.new(1,Color3.fromRGB(6,2,14))}),nil,90)
+local IslandLbl = N("TextLabel",{Text="FPS: -- | PING: --ms",Font=Enum.Font.GothamBold,
+    TextSize=11,TextColor3=C.IrisBright,BackgroundTransparency=1,
+    Size=UDim2.new(1,0,1,0),ZIndex=501,Parent=Island})
+
+-- ── Notification system ────────────────────────────────────
+local nq = {}
+local function Notify(title, msg, col)
+    col = col or C.Iris
+    for i=#nq,1,-1 do if not nq[i].Parent then table.remove(nq,i) end end
+    local slot = #nq+1
+    local fr = N("Frame",{BackgroundColor3=C.Surface,Size=UDim2.new(0,240,0,56),
+        Position=UDim2.new(1,260,1,-(slot*64+10)),ZIndex=200,Parent=Gui})
+    Rnd(14,fr); Bdr(fr,col,1,0.3)
+    N("TextLabel",{Text=title,Font=Enum.Font.GothamBold,TextSize=11,TextColor3=col,
+        BackgroundTransparency=1,Size=UDim2.new(1,-14,0,16),Position=UDim2.new(0,12,0,8),
+        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=202,Parent=fr})
+    N("TextLabel",{Text=msg,Font=Enum.Font.Gotham,TextSize=10,TextColor3=C.TextMid,
+        BackgroundTransparency=1,Size=UDim2.new(1,-14,0,14),Position=UDim2.new(0,12,0,26),
+        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=202,Parent=fr})
+    local bar = N("Frame",{BackgroundColor3=col,BackgroundTransparency=0.5,
+        Size=UDim2.new(1,-6,0,2),Position=UDim2.new(0,3,1,-3),ZIndex=203,Parent=fr})
+    Rnd(2,bar); table.insert(nq,fr)
+    Tw(fr,TI(0.4,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Position=UDim2.new(1,-248,1,-(slot*64+10))})
+    Tw(bar,TI(3.2,Enum.EasingStyle.Linear),{Size=UDim2.new(0,0,0,2)})
+    task.delay(3.2,function()
+        local idx=table.find(nq,fr); if idx then table.remove(nq,idx) end
+        Tw(fr,TI(0.28,Enum.EasingStyle.Quad,Enum.EasingDirection.In),
+            {Position=UDim2.new(1,260,fr.Position.Y.Scale,fr.Position.Y.Offset)})
+        task.delay(0.3,function() pcall(function() fr:Destroy() end) end)
+    end)
+end
+
+-- ── Main container ─────────────────────────────────────────
+local MainContainer = N("Frame",{
+    Name="MainContainer",BackgroundTransparency=1,
+    Position=UDim2.new(0,16,0.5,-PANEL_H/2),
+    Size=UDim2.new(0,PANEL_W,0,PANEL_H),
+    Parent=Gui
+})
+
+-- ── Panel frame (Orbit deep void) ──────────────────────────
+local PanelFrame = N("Frame",{
+    BackgroundColor3=Color3.fromRGB(10,4,22),BackgroundTransparency=0,BorderSizePixel=0,
+    Size=UDim2.new(1,0,1,0),ClipsDescendants=true,
+    Parent=MainContainer
+})
+Rnd(18,PanelFrame)
+
+-- ── Border overlay — sits above PanelFrame so it's never clipped ──
+local BorderOverlay = N("Frame",{
+    BackgroundTransparency=1,BorderSizePixel=0,
+    Size=UDim2.new(1,0,1,0),ZIndex=100,
+    Parent=MainContainer
+})
+Rnd(18,BorderOverlay)
+local panelStroke = Bdr(BorderOverlay,C.Iris,10,0)
+-- Gradient on a solid inner bg frame so corners stay opaque
+local BgGrad = N("Frame",{BackgroundColor3=Color3.fromRGB(10,4,22),BackgroundTransparency=0,
+    BorderSizePixel=0,Size=UDim2.new(1,0,1,0),ZIndex=0,Parent=PanelFrame})
+Grad(BgGrad,ColorSequence.new({
+    ColorSequenceKeypoint.new(0,Color3.fromRGB(18,6,38)),
+    ColorSequenceKeypoint.new(0.5,Color3.fromRGB(6,2,14)),
+    ColorSequenceKeypoint.new(1,Color3.fromRGB(10,4,22)),
+}),nil,135)
+
+-- ── Star field (Orbit signature) ───────────────────────────
+local stars = {}
+local W,H   = PANEL_W, PANEL_H
+local function MkStar(l)
+    local sz  = ({1,2,3})[l]
+    local spd = ({0.018,0.055,0.11})[l]
+    local al  = ({0.5,0.32,0.16})[l]
+    local s   = N("Frame",{
+        BackgroundColor3=({C.IrisBright,C.Iris,Color3.fromRGB(200,120,255)})[l],
+        BackgroundTransparency=al, Size=UDim2.new(0,sz,0,sz),
+        Position=UDim2.new(0,math.random(0,W),0,math.random(0,H)),
+        ZIndex=2, Parent=PanelFrame
+    })
+    Rnd(sz,s)
+    local a = math.random()*6.28
+    table.insert(stars,{f=s,x=math.random(0,W),y=math.random(0,H),
+        vx=math.cos(a)*spd*(0.6+math.random()*0.8),
+        vy=math.sin(a)*spd*(0.6+math.random()*0.8),
+        ph=math.random()*6.28, ts=spd*18+math.random()*4, base=al})
+end
+for _=1,28 do MkStar(1) end; for _=1,14 do MkStar(2) end; for _=1,6 do MkStar(3) end
+
+-- ── Scan line (Orbit signature) ────────────────────────────
+local Scan = N("Frame",{BackgroundColor3=C.IrisBright,BackgroundTransparency=0.9,
+    Size=UDim2.new(1,0,0,4),Position=UDim2.new(0,0,0,-4),ZIndex=3,Parent=PanelFrame})
+Grad(Scan,ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.new(0,0,0)),
+    ColorSequenceKeypoint.new(0.5,Color3.new(1,1,1)),ColorSequenceKeypoint.new(1,Color3.new(0,0,0))}))
+
+-- ── Title bar ──────────────────────────────────────────────
+local TitleBar = N("Frame",{BackgroundColor3=C.Deep,BackgroundTransparency=0,
+    Size=UDim2.new(1,0,0,BANNER_H),ZIndex=6,Parent=PanelFrame})
+local TGrad = N("Frame",{BackgroundColor3=C.IrisDark,BackgroundTransparency=0.4,
+    Size=UDim2.new(0.5,0,1,0),ZIndex=6,Parent=TitleBar})
+Grad(TGrad,nil,NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(1,1)}))
+
+local TitleLbl = N("TextLabel",{Text="ORBIT — DUELS",Font=Enum.Font.GothamBold,TextSize=14,
+    TextColor3=C.IrisBright,BackgroundTransparency=1,Size=UDim2.new(1,-100,1,0),
+    Position=UDim2.new(0,14,0,0),TextXAlignment=Enum.TextXAlignment.Left,ZIndex=9,Parent=TitleBar})
+Grad(TitleLbl,ColorSequence.new({
+    ColorSequenceKeypoint.new(0,C.Iris),
+    ColorSequenceKeypoint.new(0.4,C.IrisBright),
+    ColorSequenceKeypoint.new(0.6,Color3.fromRGB(235,200,255)),
+    ColorSequenceKeypoint.new(1,C.Iris)
+}))
+
+-- Close button (Orbit ×)
+local ClsOuter = N("Frame",{BackgroundColor3=C.DangerDark,Size=UDim2.new(0,26,0,26),
+    Position=UDim2.new(1,-36,0.5,-13),ZIndex=9,Parent=TitleBar})
+Rnd(999,ClsOuter); Bdr(ClsOuter,C.DangerMid,1,0.4)
+local function MkX(rot)
+    local f = N("Frame",{BackgroundColor3=C.DangerMid,AnchorPoint=Vector2.new(0.5,0.5),
+        Size=UDim2.new(0,11,0,2),Position=UDim2.new(0.5,0,0.5,0),Rotation=rot,ZIndex=11,Parent=ClsOuter})
+    Rnd(999,f); return f
+end
+local CL1,CL2 = MkX(45),MkX(-45)
+local ClsHit  = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=12,Parent=ClsOuter})
+ClsHit.MouseEnter:Connect(function()
+    Tw(ClsOuter,TI(0.15),{BackgroundColor3=C.DangerMid})
+    Tw(CL1,TI(0.15),{BackgroundColor3=C.White}); Tw(CL2,TI(0.15),{BackgroundColor3=C.White})
+end)
+ClsHit.MouseLeave:Connect(function()
+    Tw(ClsOuter,TI(0.15),{BackgroundColor3=C.DangerDark})
+    Tw(CL1,TI(0.15),{BackgroundColor3=C.DangerMid}); Tw(CL2,TI(0.15),{BackgroundColor3=C.DangerMid})
+end)
+ClsHit.MouseButton1Click:Connect(function() Gui:Destroy() end)
+
+-- Separator
+N("Frame",{BackgroundColor3=C.IrisDim,BackgroundTransparency=0.5,
+    Position=UDim2.new(0,8,0,BANNER_H-1),Size=UDim2.new(1,-16,0,1),
+    BorderSizePixel=0,ZIndex=10,Parent=PanelFrame})
+
+-- Title bar drag
+local dragging,dragInput,dragStart,startPos
+TitleBar.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        dragging=true; dragStart=i.Position; startPos=MainContainer.Position
+        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then dragging=false end end)
+    end
+end)
+TitleBar.InputChanged:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then
+        dragInput=i end
+end)
+UserInputService.InputChanged:Connect(function(i)
+    if i==dragInput and dragging then
+        local d = i.Position-dragStart
+        MainContainer.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
+    end
+end)
+
+-- ── Scroll frame ───────────────────────────────────────────
+local ScrollFrame = N("ScrollingFrame",{
+    BackgroundTransparency=1,
+    Position=UDim2.new(0,5,0,BANNER_H+5),
+    Size=UDim2.new(1,-10,1,-(BANNER_H+10)),
+    CanvasSize=UDim2.new(0,0,0,0),
+    ScrollBarThickness=3,
+    ScrollBarImageColor3=C.Iris,
+    ScrollBarImageTransparency=0.45,
+    BorderSizePixel=0,ZIndex=5,Parent=PanelFrame
+})
+pcall(function() ScrollFrame.AutomaticCanvasSize=Enum.AutomaticSize.Y end)
+local CLayout = N("UIListLayout",{
+    Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder,
+    HorizontalAlignment=Enum.HorizontalAlignment.Center,Parent=ScrollFrame
+})
+N("UIPadding",{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,8),
+    PaddingLeft=UDim.new(0,2),PaddingRight=UDim.new(0,2),Parent=ScrollFrame})
+CLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    if not pcall(function() ScrollFrame.AutomaticCanvasSize=Enum.AutomaticSize.Y end) then
+        ScrollFrame.CanvasSize=UDim2.new(0,0,0,CLayout.AbsoluteContentSize.Y+16)
+    end
+end)
+
+-- ============================================================
+--  ORBIT-STYLE UI COMPONENTS
+-- ============================================================
+
+-- Section header
+local function CreateSection(parent, title, order)
+    local fr = N("Frame",{BackgroundColor3=C.IrisDark,BackgroundTransparency=0.55,
+        Size=UDim2.new(1,-4,0,24),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
+    Rnd(999,fr); Bdr(fr,C.IrisDim,1,0.55)
+    Grad(fr,ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.new(1,1,1)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(25,5,55))}),
+        NumberSequence.new({NumberSequenceKeypoint.new(0,0.65),NumberSequenceKeypoint.new(1,0.9)}))
+    N("TextLabel",{Text=title:upper(),Font=Enum.Font.GothamBold,TextSize=9,TextColor3=C.IrisBright,
+        BackgroundTransparency=1,Size=UDim2.new(1,-16,1,0),Position=UDim2.new(0,12,0,0),
+        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,Parent=fr})
+    return fr
+end
+
+-- Toggle (Orbit style pill)
+local VisualSetters = {}
+local function CreateToggle(parent, labelText, enabledKey, callback, order)
+    local on  = Enabled[enabledKey] or false
+    local row = N("Frame",{BackgroundColor3=C.Surface,BackgroundTransparency=0.6,
+        Size=UDim2.new(1,-4,0,34),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
+    Rnd(999,row); Bdr(row,C.Lift,1,0.5)
+    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.TextMid,
+        BackgroundTransparency=1,Size=UDim2.new(1,-56,1,0),Position=UDim2.new(0,14,0,0),
+        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,Parent=row})
+    local track = N("Frame",{BackgroundColor3=on and C.IrisDim or C.Void,
+        Size=UDim2.new(0,36,0,19),Position=UDim2.new(1,-44,0.5,-9.5),ZIndex=8,Parent=row})
+    Rnd(999,track); Bdr(track,C.IrisDark,1,0.3)
+    local knob = N("Frame",{BackgroundColor3=on and C.White or C.TextLow,
+        AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(0,13,0,13),
+        Position=UDim2.new(0,on and 20 or 3,0.5,0),ZIndex=9,Parent=track})
+    Rnd(999,knob)
+    local btn = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=10,Parent=row})
+    btn.MouseEnter:Connect(function() Tw(row,TI(0.15),{BackgroundTransparency=0.35}) end)
+    btn.MouseLeave:Connect(function() Tw(row,TI(0.15),{BackgroundTransparency=0.6}) end)
+
+    local function setVisual(state, skipCb)
+        on = state
+        Tw(track,TI(0.2),{BackgroundColor3=on and C.IrisDim or C.Void})
+        Tw(knob,TI(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+            {Position=UDim2.new(0,on and 20 or 3,0.5,0), BackgroundColor3=on and C.White or C.TextLow})
+        if not skipCb and callback then callback(on) end
+    end
+    VisualSetters[enabledKey] = setVisual
+
+    btn.MouseButton1Click:Connect(function()
+        on = not on; Enabled[enabledKey] = on; setVisual(on)
+    end)
+    return row
+end
+
+-- Slider (Orbit style)
+local function CreateSlider(parent, labelText, minVal, maxVal, valueKey, callback, order)
+    local val = Values[valueKey]
+    local row = N("Frame",{BackgroundColor3=C.Surface,BackgroundTransparency=0.6,
+        Size=UDim2.new(1,-4,0,50),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
+    Rnd(999,row); Bdr(row,C.Lift,1,0.5)
+    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.TextMid,
+        BackgroundTransparency=1,Size=UDim2.new(1,-56,0,18),Position=UDim2.new(0,14,0,5),
+        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,Parent=row})
+    local valLbl = N("TextLabel",{Text=tostring(val),Font=Enum.Font.GothamBold,TextSize=11,
+        TextColor3=C.Iris,BackgroundTransparency=1,Size=UDim2.new(0,44,0,18),
+        Position=UDim2.new(1,-52,0,5),TextXAlignment=Enum.TextXAlignment.Right,ZIndex=8,Parent=row})
+    local track = N("Frame",{BackgroundColor3=C.Void,Size=UDim2.new(1,-24,0,5),
+        Position=UDim2.new(0,12,0,32),ZIndex=8,Parent=row})
+    Rnd(999,track); Bdr(track,C.Lift,1,0.6)
+    local pct  = (val-minVal)/(maxVal-minVal)
+    local fill = N("Frame",{BackgroundColor3=C.Iris,Size=UDim2.new(pct,0,1,0),ZIndex=9,Parent=track})
+    Rnd(999,fill)
+    Grad(fill,ColorSequence.new({ColorSequenceKeypoint.new(0,C.IrisDim),ColorSequenceKeypoint.new(1,C.IrisBright)}))
+    local hitZ   = N("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),
+        Position=UDim2.new(0,0,0.5,-15),ZIndex=11,Parent=track})
+    local handle = N("Frame",{BackgroundColor3=C.White,AnchorPoint=Vector2.new(0.5,0.5),
+        Size=UDim2.new(0,13,0,13),Position=UDim2.new(pct,0,0.5,0),ZIndex=10,Parent=track})
+    Rnd(999,handle); Bdr(handle,C.IrisBright,1.5,0)
+    local draggingS = false
+    local function upd(x)
+        local r = math.clamp((x-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1)
+        val = math.floor(minVal+(maxVal-minVal)*r+0.5)
+        valLbl.Text = tostring(val)
+        Tw(fill,TI(0.04),{Size=UDim2.new(r,0,1,0)})
+        Tw(handle,TI(0.04),{Position=UDim2.new(r,0,0.5,0)})
+        Values[valueKey] = val
+        if callback then callback(val) end
+    end
+    hitZ.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+            draggingS=true; upd(i.Position.X) end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if not draggingS then return end
+        if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then
+            upd(i.Position.X) end
+    end)
+    UserInputService.InputEnded:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+            draggingS=false end
+    end)
+    return row
+end
+
+-- ── Progress bar (Orbit palette, bottom of screen) ─────────
+local pbar = N("Frame",{Size=UDim2.new(0,PBAR_W,0,44),
+    Position=UDim2.new(0.5,-PBAR_W/2,1,-110),
+    BackgroundColor3=C.Panel,BorderSizePixel=0,ZIndex=10,Parent=Gui})
+Rnd(14,pbar)
+local pStroke = Bdr(pbar,C.Iris,2.5,0)
+local pGrad   = N("UIGradient",{Parent=pStroke})
+pGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   C.Iris),
+    ColorSequenceKeypoint.new(0.25,C.IrisDim),
+    ColorSequenceKeypoint.new(0.5, C.IrisBright),
+    ColorSequenceKeypoint.new(0.75,C.IrisDim),
+    ColorSequenceKeypoint.new(1,   C.Iris),
+})
+task.spawn(function()
+    local r = 0
+    while pbar.Parent do r=(r+2)%360; pGrad.Rotation=r; task.wait(0.02) end
+end)
+
+ProgressLabel = N("TextLabel",{Size=UDim2.new(0.55,0,1,0),Position=UDim2.new(0,14,0,0),
+    BackgroundTransparency=1,Text="READY",TextColor3=C.White,
+    Font=Enum.Font.GothamBold,TextSize=14,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=12,Parent=pbar})
+ProgressPercentLabel = N("TextLabel",{Size=UDim2.new(0.4,0,1,0),Position=UDim2.new(0.3,0,0,0),
+    BackgroundTransparency=1,Text="",TextColor3=C.IrisBright,
+    Font=Enum.Font.GothamBlack,TextSize=13,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=12,Parent=pbar})
+local statRadius = N("TextLabel",{Size=UDim2.new(0,38,1,0),Position=UDim2.new(1,-44,0,0),
+    BackgroundTransparency=1,Text=tostring(Values.STEAL_RADIUS),TextColor3=C.Iris,
+    Font=Enum.Font.GothamBold,TextSize=13,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=12,Parent=pbar})
+local pTrack = N("Frame",{Size=UDim2.new(1,-16,0,4),Position=UDim2.new(0,8,1,-7),
+    BackgroundColor3=C.Void,BorderSizePixel=0,ZIndex=11,Parent=pbar})
+Rnd(999,pTrack)
+ProgressBarFill = N("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=C.Iris,
+    BorderSizePixel=0,ZIndex=12,Parent=pTrack})
+Rnd(999,ProgressBarFill)
+Grad(ProgressBarFill,ColorSequence.new({
+    ColorSequenceKeypoint.new(0,C.IrisDim),ColorSequenceKeypoint.new(1,C.IrisBright)}))
+RunService.Heartbeat:Connect(function() statRadius.Text = tostring(Values.STEAL_RADIUS) end)
+
+-- ── OD floating logo circle ─────────────────────────────────
+local chSize   = 48
+local chCircle = N("Frame",{Name="OD_Logo",
+    Size=UDim2.new(0,chSize,0,chSize),
+    Position=UDim2.new(0,16,0.5,-(PANEL_H/2)-chSize-10),
+    BackgroundColor3=Color3.fromRGB(12,4,28),BorderSizePixel=0,ZIndex=50,Parent=Gui})
+Rnd(999,chCircle)
+local chStroke = Bdr(chCircle,C.Iris,2.5,0)
+local chGrad   = N("UIGradient",{Parent=chStroke})
+chGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,  C.IrisBright),
+    ColorSequenceKeypoint.new(0.5,C.Iris),
+    ColorSequenceKeypoint.new(1,  C.IrisBright),
+})
+task.spawn(function()
+    local r=0
+    while chCircle.Parent do r=(r+2)%360; chGrad.Rotation=r; task.wait(0.02) end
+end)
+N("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Font=Enum.Font.GothamBlack,
+    Text="OD",TextColor3=C.White,TextSize=16,
+    TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,
+    ZIndex=51,Parent=chCircle})
+local chBtn    = N("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=52,Parent=chCircle})
+
+local uiVisible = true
+local cMoved    = false
+chBtn.MouseButton1Click:Connect(function()
+    if cMoved then cMoved=false; return end
+    uiVisible = not uiVisible
+    MainContainer.Visible = uiVisible
+    Tw(chCircle,TI(0.2),{BackgroundColor3=uiVisible and Color3.fromRGB(12,4,28) or Color3.fromRGB(35,10,70)})
+end)
+local cDrag,cDragStart,cDragPos = false,nil,nil
+chBtn.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        cDrag=true; cMoved=false; cDragStart=i.Position; cDragPos=chCircle.Position
+        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then cDrag=false end end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(i)
+    if cDrag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+        local d = i.Position-cDragStart
+        if d.Magnitude>4 then
+            cMoved=true
+            chCircle.Position=UDim2.new(cDragPos.X.Scale,cDragPos.X.Offset+d.X,cDragPos.Y.Scale,cDragPos.Y.Offset+d.Y)
+        end
+    end
+end)
+
+-- ============================================================
+--  POPULATE SECTIONS (same layout as Chiron, Orbit styling)
+-- ============================================================
+local order = 1
+
+-- ── MOVEMENT ───────────────────────────────────────────────
+CreateSection(ScrollFrame,"⚡  MOVEMENT",order) order+=1
+CreateToggle(ScrollFrame,"Speed Boost [V]","SpeedBoost",function(s)
+    Enabled.SpeedBoost=s; if s then startSpeedBoost() else stopSpeedBoost() end end,order) order+=1
+CreateSlider(ScrollFrame,"Boost Speed",1,70,"BoostSpeed",function(v) Values.BoostSpeed=v end,order) order+=1
+CreateToggle(ScrollFrame,"Float [F]","Float",function(s)
+    Enabled.Float=s; if s then startFloat() else stopFloat() end end,order) order+=1
+CreateToggle(ScrollFrame,"Gravity Mode","GalaxyMode",function(s)
+    Enabled.GalaxyMode=s; if s then startGalaxyMode() else stopGalaxyMode() end end,order) order+=1
+CreateSlider(ScrollFrame,"Gravity %",25,130,"GalaxyGravityPercent",function(v)
+    Values.GalaxyGravityPercent=v; if galaxyEnabled then galaxyAdjustJump() end end,order) order+=1
+
+-- ── STEALING ───────────────────────────────────────────────
+CreateSection(ScrollFrame,"🐾  STEALING",order) order+=1
+CreateToggle(ScrollFrame,"Auto Grab","AutoSteal",function(s)
+    Enabled.AutoSteal=s; if s then startAutoSteal() else stopAutoSteal() end end,order) order+=1
+CreateSlider(ScrollFrame,"Steal Radius",5,100,"STEAL_RADIUS",function(v) Values.STEAL_RADIUS=v end,order) order+=1
+CreateToggle(ScrollFrame,"Speed While Stealing","SpeedWhileStealing",function(s)
+    Enabled.SpeedWhileStealing=s; if s then startSpeedWhileStealing() else stopSpeedWhileStealing() end end,order) order+=1
+CreateSlider(ScrollFrame,"Steal Speed",10,35,"StealingSpeedValue",function(v) Values.StealingSpeedValue=v end,order) order+=1
+CreateToggle(ScrollFrame,"Auto Right [E]","AutoRight",function(s)
+    Enabled.AutoRight=s
+    if s then
+        Enabled.AutoLeft=false
+        if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
+        stopStealPath(); startStealPath(stealPath_Right)
+    else stopStealPath() end end,order) order+=1
+CreateToggle(ScrollFrame,"Auto Left [Q]","AutoLeft",function(s)
+    Enabled.AutoLeft=s
+    if s then
+        Enabled.AutoRight=false
+        if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
+        stopStealPath(); startStealPath(stealPath_Left)
+    else stopStealPath() end end,order) order+=1
+
+-- ── COMBAT ─────────────────────────────────────────────────
+CreateSection(ScrollFrame,"⚔️  COMBAT",order) order+=1
+CreateToggle(ScrollFrame,"Hit Circle","HitCircle",function(s)
+    Enabled.HitCircle=s; if s then startHitCircle() else stopHitCircle() end end,order) order+=1
+CreateToggle(ScrollFrame,"Anti Ragdoll","AntiRagdoll",function(s)
+    Enabled.AntiRagdoll=s; if s then startAntiRagdoll() else stopAntiRagdoll() end end,order) order+=1
+CreateToggle(ScrollFrame,"Spam Bat","SpamBat",function(s)
+    Enabled.SpamBat=s; if s then startSpamBat() else stopSpamBat() end end,order) order+=1
+CreateToggle(ScrollFrame,"🎯 Bat Aimbot [X]","BatAimbot",function(s)
+    Enabled.BatAimbot=s; if s then startBatAimbot() else stopBatAimbot() end end,order) order+=1
+CreateSlider(ScrollFrame,"Aimbot Speed",10,120,"BatAimbotSpeed",function(v) Values.BatAimbotSpeed=v end,order) order+=1
+CreateToggle(ScrollFrame,"Spin Bot","Helicopter",function(s)
+    Enabled.Helicopter=s; if s then startHelicopter() else stopHelicopter() end end,order) order+=1
+CreateSlider(ScrollFrame,"Spin Speed",5,80,"SpinSpeed",function(v)
+    Values.SpinSpeed=v; if helicopterBAV then helicopterBAV.AngularVelocity=Vector3.new(0,v,0) end end,order) order+=1
+CreateToggle(ScrollFrame,"Unwalk","Unwalk",function(s)
+    Enabled.Unwalk=s; if s then startUnwalk() else stopUnwalk() end end,order) order+=1
+
+-- ── VISUAL & MISC ──────────────────────────────────────────
+CreateSection(ScrollFrame,"✨  VISUAL & MISC",order) order+=1
+CreateToggle(ScrollFrame,"Optimizer + XRay","OptimizerXRay",function(s)
+    Enabled.OptimizerXRay=s
+    if s then enableOptimizer(); enableXRay() else disableOptimizer(); disableXRay() end end,order) order+=1
+
+-- ============================================================
+--  FLOATING ACTION BUTTONS (Orbit style, right edge)
+-- ============================================================
+local floatBtnUpdateRight, floatBtnUpdateLeft, floatBtnUpdateFloat, floatBtnUpdateAimbot
+
+local function CreateFloatingButton(labelText, icon, defaultPos, enabledKey, onToggle)
+    local btnFrame = N("Frame",{BackgroundColor3=C.Panel,Position=defaultPos,
+        Size=UDim2.new(0,130,0,36),BorderSizePixel=0,ZIndex=20,Parent=Gui})
+    Rnd(12,btnFrame)
+    local fbStroke = Bdr(btnFrame,C.IrisDim,2,0)
+    Grad(btnFrame,ColorSequence.new{
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(18,6,38)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(8,3,20))
+    },nil,90)
+    local glowFrame = N("Frame",{BackgroundColor3=C.Iris,BackgroundTransparency=0.85,
+        Size=UDim2.new(1,6,1,6),Position=UDim2.new(0,-3,0,-3),BorderSizePixel=0,ZIndex=19,Parent=btnFrame})
+    Rnd(14,glowFrame)
+    N("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,8,0,0),Size=UDim2.new(0,26,1,0),
+        Font=Enum.Font.GothamBold,Text=icon,TextColor3=C.Iris,TextSize=15,ZIndex=22,Parent=btnFrame})
+    local textLabel = N("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,36,0,0),
+        Size=UDim2.new(1,-50,1,0),Font=Enum.Font.GothamBold,Text=labelText,
+        TextColor3=C.TextMid,TextSize=10,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=22,Parent=btnFrame})
+    local statusDot = N("Frame",{BackgroundColor3=Color3.fromRGB(40,20,70),Size=UDim2.new(0,8,0,8),
+        Position=UDim2.new(1,-14,0.5,-4),BorderSizePixel=0,ZIndex=22,Parent=btnFrame})
+    Rnd(999,statusDot)
+    local isActive = Enabled[enabledKey] or false
+    local function updateVisual(state)
+        isActive = state
+        Tw(statusDot, TI(0.2),{BackgroundColor3=state and C.Green or Color3.fromRGB(40,20,70)})
+        Tw(btnFrame,  TI(0.2),{BackgroundColor3=state and Color3.fromRGB(25,8,55) or C.Panel})
+        Tw(glowFrame, TI(0.2),{BackgroundTransparency=state and 0.6 or 0.85})
+        Tw(textLabel, TI(0.2),{TextColor3=state and C.IrisBright or C.TextMid})
+        Tw(fbStroke,  TI(0.2),{Color=state and C.Iris or C.IrisDim})
+    end
+    local clickBtn = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=23,Parent=btnFrame})
+    local fDrag,fDS,fSP,fMov = false,nil,nil,false
+    clickBtn.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+            fDrag=true; fMov=false; fDS=i.Position; fSP=btnFrame.Position
+            i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then fDrag=false end end)
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(i)
+        if fDrag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+            local d=i.Position-fDS
+            if d.Magnitude>5 then
+                fMov=true
+                btnFrame.Position=UDim2.new(fSP.X.Scale,fSP.X.Offset+d.X,fSP.Y.Scale,fSP.Y.Offset+d.Y)
+            end
+        end
+    end)
+    clickBtn.MouseButton1Click:Connect(function()
+        if fMov then return end
+        isActive=not isActive; Enabled[enabledKey]=isActive; updateVisual(isActive); onToggle(isActive,updateVisual)
+    end)
+    task.spawn(function()
+        while btnFrame and btnFrame.Parent do
+            if isActive then
+                Tw(glowFrame,TI(0.8,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,0,true),{BackgroundTransparency=0.72})
+            end
+            task.wait(0.9)
+        end
+    end)
+    return updateVisual
+end
+
+floatBtnUpdateRight = CreateFloatingButton("Auto Right [E]","➡",UDim2.new(1,-144,0.5,-64),"AutoRight",function(state)
+    if state then
+        Enabled.AutoLeft=false
+        if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
+        if floatBtnUpdateLeft then floatBtnUpdateLeft(false) end
+        stopStealPath(); startStealPath(stealPath_Right)
+    else stopStealPath() end
+end)
+
+floatBtnUpdateLeft = CreateFloatingButton("Auto Left [Q]","⬅",UDim2.new(1,-144,0.5,-22),"AutoLeft",function(state)
+    if state then
+        Enabled.AutoRight=false
+        if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
+        if floatBtnUpdateRight then floatBtnUpdateRight(false) end
+        stopStealPath(); startStealPath(stealPath_Left)
+    else stopStealPath() end
+end)
+
+floatBtnUpdateFloat = CreateFloatingButton("Float [F]","🚀",UDim2.new(1,-144,0.5,20),"Float",function(state)
+    Enabled.Float=state
+    if VisualSetters.Float then VisualSetters.Float(state,true) end
+    if state then startFloat() else stopFloat() end
+end)
+
+floatBtnUpdateAimbot = CreateFloatingButton("Bat Aimbot [X]","🎯",UDim2.new(1,-144,0.5,62),"BatAimbot",function(state)
+    Enabled.BatAimbot=state
+    if VisualSetters.BatAimbot then VisualSetters.BatAimbot(state,true) end
+    if state then startBatAimbot() else stopBatAimbot() end
+end)
+
+-- ============================================================
+--  KEYBINDS & CHARACTER RESPAWN
+-- ============================================================
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.Delete then
+        Gui:Destroy()
+    elseif input.KeyCode == Enum.KeyCode.U then
+        uiVisible = not uiVisible
+        MainContainer.Visible = uiVisible
+        Tw(chCircle,TI(0.2),{BackgroundColor3=uiVisible and Color3.fromRGB(12,4,28) or Color3.fromRGB(35,10,70)})
+    elseif input.KeyCode == KEYBINDS.SPEED then
+        Enabled.SpeedBoost = not Enabled.SpeedBoost
+        if VisualSetters.SpeedBoost then VisualSetters.SpeedBoost(Enabled.SpeedBoost) end
+        if Enabled.SpeedBoost then startSpeedBoost() else stopSpeedBoost() end
+    elseif input.KeyCode == KEYBINDS.FLOAT then
+        Enabled.Float = not Enabled.Float
+        if VisualSetters.Float then VisualSetters.Float(Enabled.Float) end
+        if floatBtnUpdateFloat then floatBtnUpdateFloat(Enabled.Float) end
+        if Enabled.Float then startFloat() else stopFloat() end
+    elseif input.KeyCode == KEYBINDS.BATAIMBOT then
+        Enabled.BatAimbot = not Enabled.BatAimbot
+        if VisualSetters.BatAimbot then VisualSetters.BatAimbot(Enabled.BatAimbot) end
+        if floatBtnUpdateAimbot then floatBtnUpdateAimbot(Enabled.BatAimbot) end
+        if Enabled.BatAimbot then startBatAimbot() else stopBatAimbot() end
+    elseif input.KeyCode == KEYBINDS.AUTORIGHT then
+        Enabled.AutoRight = not Enabled.AutoRight
+        if VisualSetters.AutoRight then VisualSetters.AutoRight(Enabled.AutoRight) end
+        if floatBtnUpdateRight then floatBtnUpdateRight(Enabled.AutoRight) end
+        if Enabled.AutoRight then
+            Enabled.AutoLeft=false
+            if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
+            if floatBtnUpdateLeft then floatBtnUpdateLeft(false) end
+            stopStealPath(); startStealPath(stealPath_Right)
+        else stopStealPath() end
+    elseif input.KeyCode == KEYBINDS.AUTOLEFT then
+        Enabled.AutoLeft = not Enabled.AutoLeft
+        if VisualSetters.AutoLeft then VisualSetters.AutoLeft(Enabled.AutoLeft) end
+        if floatBtnUpdateLeft then floatBtnUpdateLeft(Enabled.AutoLeft) end
+        if Enabled.AutoLeft then
+            Enabled.AutoRight=false
+            if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
+            if floatBtnUpdateRight then floatBtnUpdateRight(false) end
+            stopStealPath(); startStealPath(stealPath_Left)
+        else stopStealPath() end
+    end
+end)
+
+Player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Enabled.SpeedBoost      then startSpeedBoost()        end
+    if Enabled.AutoSteal       then startAutoSteal()         end
+    if Enabled.SpeedWhileStealing then startSpeedWhileStealing() end
+    if Enabled.AntiRagdoll     then startAntiRagdoll()       end
+    if Enabled.HitCircle       then stopHitCircle(); task.wait(0.1); startHitCircle() end
+    if Enabled.SpamBat         then startSpamBat()           end
+    if Enabled.Helicopter      then startHelicopter()        end
+    if Enabled.BatAimbot       then stopBatAimbot(); task.wait(0.1); startBatAimbot() end
+end)
+
+-- ============================================================
+--  ANIMATE — stars, scan line, title pulse, FPS/Ping
+-- ============================================================
+local _t, _sy = 0, -4.0
+RunService.Heartbeat:Connect(function(dt)
+    _t  = _t  + dt
+    _sy = _sy + 48*dt
+    if _sy > H+5 then _sy = -4 end
+    for _, s in ipairs(stars) do
+        s.x = s.x+s.vx; s.y = s.y+s.vy
+        if s.x>W+3 then s.x=-3 elseif s.x<-3 then s.x=W+3 end
+        if s.y>H+3 then s.y=-3 elseif s.y<-3 then s.y=H+3 end
+        s.f.Position         = UDim2.new(0,s.x,0,s.y)
+        s.f.BackgroundTransparency = math.clamp(s.base+math.sin(_t*s.ts+s.ph)*0.2,0.05,0.95)
+    end
+    Scan.Position             = UDim2.new(0,0,0,_sy)
+    Scan.BackgroundTransparency = 0.87+math.sin(_t*2.8)*0.07
+    TitleLbl.TextColor3       = C.Iris:Lerp(Color3.fromRGB(230,190,255),0.5+math.sin(_t*0.9)*0.5)
+end)
+
+RunService.RenderStepped:Connect(function(dt)
+    local fps  = math.floor(1/dt)
+    local ping = 0
+    pcall(function() ping=math.floor(Stats_s.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
+    IslandLbl.Text = "FPS: "..fps.." | PING: "..ping.."ms"
+end)
+
+-- ── Entrance animation (Orbit open) ────────────────────────
+MainContainer.Size    = UDim2.new(0,PANEL_W,0,0)
+MainContainer.Position= UDim2.new(0,16,0.5,0)
+Tw(MainContainer,TI(0.55,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+    {Size=UDim2.new(0,PANEL_W,0,PANEL_H), Position=UDim2.new(0,16,0.5,-PANEL_H/2)})
+
+task.delay(0.7, function()
+    Notify("Orbit — Duels","Loaded and ready",C.Iris)
+end)
