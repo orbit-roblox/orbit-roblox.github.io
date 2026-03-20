@@ -1,5 +1,6 @@
 -- ============================================================
 --  ORBIT — DUELS  (Universal: Auto PC / Mobile)
+--  Mobile gets the same mini panel as PC — no sheet / no FABs
 -- ============================================================
 
 local CoreGui          = game:GetService("CoreGui")
@@ -37,7 +38,6 @@ local Enabled = {
     OptimizerXRay      = false,
     SpamBat            = false,
     Helicopter         = false,
-    Vibrance           = false,
     AutoRight          = false,
     AutoLeft           = false,
     GalaxyMode         = false,
@@ -404,13 +404,13 @@ local function stopBatAimbot()
 end
 
 -- Galaxy / Gravity Mode
-local galaxyEnabled     = false
-local galaxyHops        = false
-local galaxyLastHop     = 0
-local galaxySpaceHeld   = false
-local galaxyOrigJump    = 50
-local galaxyForce       = nil
-local galaxyAttach      = nil
+local galaxyEnabled   = false
+local galaxyHops      = false
+local galaxyLastHop   = 0
+local galaxySpaceHeld = false
+local galaxyOrigJump  = 50
+local galaxyForce     = nil
+local galaxyAttach    = nil
 
 local function galaxyCaptureJump()
     local c = Player.Character; if not c then return end
@@ -428,11 +428,11 @@ local function galaxySetupForce()
         if galaxyAttach then galaxyAttach:Destroy() end
         galaxyAttach = Instance.new("Attachment"); galaxyAttach.Parent = h
         galaxyForce  = Instance.new("VectorForce")
-        galaxyForce.Attachment0          = galaxyAttach
-        galaxyForce.ApplyAtCenterOfMass  = true
-        galaxyForce.RelativeTo           = Enum.ActuatorRelativeTo.World
-        galaxyForce.Force                = Vector3.zero
-        galaxyForce.Parent               = h
+        galaxyForce.Attachment0         = galaxyAttach
+        galaxyForce.ApplyAtCenterOfMass = true
+        galaxyForce.RelativeTo          = Enum.ActuatorRelativeTo.World
+        galaxyForce.Force               = Vector3.zero
+        galaxyForce.Parent              = h
     end)
 end
 local function galaxyUpdateForce()
@@ -633,12 +633,12 @@ end
 -- Steal Paths
 local stealPathActive  = false
 local stealLastFlatVel = Vector3.zero
-local SP_FAST          = 59.2
-local SP_SLOW          = 29.6
-local SP_STOP_BASE     = 1.35
-local SP_STOP_MIN      = 0.65
-local SP_BIAS          = 0.45
-local SP_SMOOTH        = 0.12
+local SP_FAST      = 59.2
+local SP_SLOW      = 29.6
+local SP_STOP_BASE = 1.35
+local SP_STOP_MIN  = 0.65
+local SP_BIAS      = 0.45
+local SP_SMOOTH    = 0.12
 
 local stealPath_Right = {
     {pos=Vector3.new(-470.6,-5.9,34.4)},
@@ -702,7 +702,9 @@ local function stopStealPath()
 end
 
 -- ============================================================
---  SHARED GUI UTILITIES
+--  GUI — identical Orbit panel on both PC and Mobile
+--  Mobile: slightly wider + taller rows for fingers, anchored
+--  to the right side so it avoids the on-screen joystick
 -- ============================================================
 pcall(function()
     for _, v in ipairs(CoreGui:GetChildren()) do
@@ -742,6 +744,25 @@ local C = {
     Green      = Color3.fromRGB(80,255,160),
 }
 
+-- Mobile gets a slightly wider panel + taller touch targets
+local PANEL_W        = IS_MOBILE and 255  or 230
+local PANEL_H        = IS_MOBILE and 510  or 480
+local BANNER_H       = 46
+local ROW_TOGGLE_H   = IS_MOBILE and 40   or 34
+local ROW_SLIDER_H   = IS_MOBILE and 54   or 50
+local KNOB_SZ        = IS_MOBILE and 17   or 13
+local KNOB_ON        = IS_MOBILE and 22   or 20
+local TRACK_W        = IS_MOBILE and 42   or 36
+local TRACK_H        = IS_MOBILE and 22   or 19
+local SLIDER_HIT_H   = IS_MOBILE and 44   or 30
+local SLIDER_HNDL_SZ = IS_MOBILE and 17   or 13
+local PBAR_W         = IS_MOBILE and 290  or 310
+
+-- Panel sits left on PC, right on mobile (avoids joystick)
+local PANEL_ANCHOR_X = IS_MOBILE
+    and UDim2.new(1, -(PANEL_W + 10), 0.5, -PANEL_H/2)
+    or  UDim2.new(0, 16,              0.5, -PANEL_H/2)
+
 local TI = TweenInfo.new
 
 local function N(cls, props, children)
@@ -764,61 +785,6 @@ local function Grad(p,c,tr,rot)
     return g
 end
 
--- ============================================================
---  PROGRESS BAR (shared between PC and Mobile)
--- ============================================================
-local pbarW = IS_MOBILE and 280 or 310
-local pbar = N("Frame",{Size=UDim2.new(0,pbarW,0,44),
-    Position=UDim2.new(0.5,-pbarW/2,1,-110),
-    BackgroundColor3=C.Panel,BorderSizePixel=0,ZIndex=10,Parent=Gui})
-Rnd(14,pbar)
-local pStroke = Bdr(pbar,C.Iris,2.5,0)
-local pGrad   = N("UIGradient",{Parent=pStroke})
-pGrad.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0,   C.Iris),
-    ColorSequenceKeypoint.new(0.25,C.IrisDim),
-    ColorSequenceKeypoint.new(0.5, C.IrisBright),
-    ColorSequenceKeypoint.new(0.75,C.IrisDim),
-    ColorSequenceKeypoint.new(1,   C.Iris),
-})
-task.spawn(function()
-    local r = 0
-    while pbar.Parent do r=(r+2)%360; pGrad.Rotation=r; task.wait(0.02) end
-end)
-ProgressLabel = N("TextLabel",{Size=UDim2.new(0.55,0,1,0),Position=UDim2.new(0,14,0,0),
-    BackgroundTransparency=1,Text="READY",TextColor3=C.White,
-    Font=Enum.Font.GothamBold,TextSize=14,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=12,Parent=pbar})
-ProgressPercentLabel = N("TextLabel",{Size=UDim2.new(0.4,0,1,0),Position=UDim2.new(0.3,0,0,0),
-    BackgroundTransparency=1,Text="",TextColor3=C.IrisBright,
-    Font=Enum.Font.GothamBlack,TextSize=13,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=12,Parent=pbar})
-local statRadius = N("TextLabel",{Size=UDim2.new(0,38,1,0),Position=UDim2.new(1,-44,0,0),
-    BackgroundTransparency=1,Text=tostring(Values.STEAL_RADIUS),TextColor3=C.Iris,
-    Font=Enum.Font.GothamBold,TextSize=13,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=12,Parent=pbar})
-local pTrack = N("Frame",{Size=UDim2.new(1,-16,0,4),Position=UDim2.new(0,8,1,-7),
-    BackgroundColor3=C.Void,BorderSizePixel=0,ZIndex=11,Parent=pbar})
-Rnd(999,pTrack)
-ProgressBarFill = N("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=C.Iris,
-    BorderSizePixel=0,ZIndex=12,Parent=pTrack})
-Rnd(999,ProgressBarFill)
-Grad(ProgressBarFill,ColorSequence.new({
-    ColorSequenceKeypoint.new(0,C.IrisDim),ColorSequenceKeypoint.new(1,C.IrisBright)}))
-RunService.Heartbeat:Connect(function() statRadius.Text = tostring(Values.STEAL_RADIUS) end)
-
--- ============================================================
---  VISUAL SETTERS (shared toggle state registry)
--- ============================================================
-local VisualSetters = {}
-
--- ============================================================
-if not IS_MOBILE then
--- ============================================================
---  PC VERSION  (original Orbit layout)
--- ============================================================
-
-local PANEL_W  = 230
-local PANEL_H  = 480
-local BANNER_H = 46
-
 -- ── FPS / Ping island ──────────────────────────────────────
 local Island = N("Frame",{BackgroundColor3=C.Panel,Size=UDim2.new(0,200,0,28),
     Position=UDim2.new(0.5,-100,0,6),ZIndex=500,Parent=Gui})
@@ -829,7 +795,7 @@ local IslandLbl = N("TextLabel",{Text="FPS: -- | PING: --ms",Font=Enum.Font.Goth
     TextSize=11,TextColor3=C.IrisBright,BackgroundTransparency=1,
     Size=UDim2.new(1,0,1,0),ZIndex=501,Parent=Island})
 
--- ── Notifications ──────────────────────────────────────────
+-- ── Notification system ────────────────────────────────────
 local nq = {}
 local function Notify(title, msg, col)
     col = col or C.Iris
@@ -860,22 +826,21 @@ end
 -- ── Main container ─────────────────────────────────────────
 local MainContainer = N("Frame",{
     Name="MainContainer",BackgroundTransparency=1,
-    Position=UDim2.new(0,16,0.5,-PANEL_H/2),
+    Position=PANEL_ANCHOR_X,
     Size=UDim2.new(0,PANEL_W,0,PANEL_H),
     Parent=Gui
 })
 
+-- ── Panel frame ────────────────────────────────────────────
 local PanelFrame = N("Frame",{
     BackgroundColor3=Color3.fromRGB(10,4,22),BackgroundTransparency=0,BorderSizePixel=0,
-    Size=UDim2.new(1,0,1,0),ClipsDescendants=true,
-    Parent=MainContainer
+    Size=UDim2.new(1,0,1,0),ClipsDescendants=true,Parent=MainContainer
 })
 Rnd(18,PanelFrame)
 
 local BorderOverlay = N("Frame",{
     BackgroundTransparency=1,BorderSizePixel=0,
-    Size=UDim2.new(1,0,1,0),ZIndex=100,
-    Parent=MainContainer
+    Size=UDim2.new(1,0,1,0),ZIndex=100,Parent=MainContainer
 })
 Rnd(18,BorderOverlay)
 Bdr(BorderOverlay,C.Iris,10,0)
@@ -883,55 +848,55 @@ Bdr(BorderOverlay,C.Iris,10,0)
 local BgGrad = N("Frame",{BackgroundColor3=Color3.fromRGB(10,4,22),BackgroundTransparency=0,
     BorderSizePixel=0,Size=UDim2.new(1,0,1,0),ZIndex=0,Parent=PanelFrame})
 Grad(BgGrad,ColorSequence.new({
-    ColorSequenceKeypoint.new(0,Color3.fromRGB(18,6,38)),
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(18,6,38)),
     ColorSequenceKeypoint.new(0.5,Color3.fromRGB(6,2,14)),
-    ColorSequenceKeypoint.new(1,Color3.fromRGB(10,4,22)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10,4,22)),
 }),nil,135)
 
--- Stars
+-- ── Star field ─────────────────────────────────────────────
 local stars = {}
-local W,H   = PANEL_W, PANEL_H
+local W, H  = PANEL_W, PANEL_H
 local function MkStar(l)
     local sz  = ({1,2,3})[l]
     local spd = ({0.018,0.055,0.11})[l]
     local al  = ({0.5,0.32,0.16})[l]
     local s   = N("Frame",{
         BackgroundColor3=({C.IrisBright,C.Iris,Color3.fromRGB(200,120,255)})[l],
-        BackgroundTransparency=al, Size=UDim2.new(0,sz,0,sz),
-        Position=UDim2.new(0,math.random(0,W),0,math.random(0,H)),
-        ZIndex=2, Parent=PanelFrame
-    })
+        BackgroundTransparency=al,Size=UDim2.new(0,sz,0,sz),
+        Position=UDim2.new(0,math.random(0,W),0,math.random(0,H)),ZIndex=2,Parent=PanelFrame})
     Rnd(sz,s)
     local a = math.random()*6.28
     table.insert(stars,{f=s,x=math.random(0,W),y=math.random(0,H),
         vx=math.cos(a)*spd*(0.6+math.random()*0.8),
         vy=math.sin(a)*spd*(0.6+math.random()*0.8),
-        ph=math.random()*6.28, ts=spd*18+math.random()*4, base=al})
+        ph=math.random()*6.28,ts=spd*18+math.random()*4,base=al})
 end
 for _=1,28 do MkStar(1) end; for _=1,14 do MkStar(2) end; for _=1,6 do MkStar(3) end
 
+-- ── Scan line ──────────────────────────────────────────────
 local Scan = N("Frame",{BackgroundColor3=C.IrisBright,BackgroundTransparency=0.9,
     Size=UDim2.new(1,0,0,4),Position=UDim2.new(0,0,0,-4),ZIndex=3,Parent=PanelFrame})
 Grad(Scan,ColorSequence.new({ColorSequenceKeypoint.new(0,Color3.new(0,0,0)),
     ColorSequenceKeypoint.new(0.5,Color3.new(1,1,1)),ColorSequenceKeypoint.new(1,Color3.new(0,0,0))}))
 
--- Title bar
+-- ── Title bar ──────────────────────────────────────────────
 local TitleBar = N("Frame",{BackgroundColor3=C.Deep,BackgroundTransparency=0,
     Size=UDim2.new(1,0,0,BANNER_H),ZIndex=6,Parent=PanelFrame})
 local TGrad = N("Frame",{BackgroundColor3=C.IrisDark,BackgroundTransparency=0.4,
     Size=UDim2.new(0.5,0,1,0),ZIndex=6,Parent=TitleBar})
 Grad(TGrad,nil,NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(1,1)}))
 
-local TitleLbl = N("TextLabel",{Text="ORBIT — DUELS",Font=Enum.Font.GothamBold,TextSize=14,
+-- Title shows a 📱 badge on mobile so the user knows which version loaded
+local TitleLbl = N("TextLabel",{
+    Text = IS_MOBILE and "ORBIT — DUELS  📱" or "ORBIT — DUELS",
+    Font=Enum.Font.GothamBold,TextSize=IS_MOBILE and 12 or 14,
     TextColor3=C.IrisBright,BackgroundTransparency=1,Size=UDim2.new(1,-100,1,0),
     Position=UDim2.new(0,14,0,0),TextXAlignment=Enum.TextXAlignment.Left,ZIndex=9,Parent=TitleBar})
 Grad(TitleLbl,ColorSequence.new({
-    ColorSequenceKeypoint.new(0,C.Iris),
-    ColorSequenceKeypoint.new(0.4,C.IrisBright),
-    ColorSequenceKeypoint.new(0.6,Color3.fromRGB(235,200,255)),
-    ColorSequenceKeypoint.new(1,C.Iris)
-}))
+    ColorSequenceKeypoint.new(0,C.Iris),ColorSequenceKeypoint.new(0.4,C.IrisBright),
+    ColorSequenceKeypoint.new(0.6,Color3.fromRGB(235,200,255)),ColorSequenceKeypoint.new(1,C.Iris)}))
 
+-- Close button
 local ClsOuter = N("Frame",{BackgroundColor3=C.DangerDark,Size=UDim2.new(0,26,0,26),
     Position=UDim2.new(1,-36,0.5,-13),ZIndex=9,Parent=TitleBar})
 Rnd(999,ClsOuter); Bdr(ClsOuter,C.DangerMid,1,0.4)
@@ -941,7 +906,7 @@ local function MkX(rot)
     Rnd(999,f); return f
 end
 local CL1,CL2 = MkX(45),MkX(-45)
-local ClsHit  = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=12,Parent=ClsOuter})
+local ClsHit = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=12,Parent=ClsOuter})
 ClsHit.MouseEnter:Connect(function()
     Tw(ClsOuter,TI(0.15),{BackgroundColor3=C.DangerMid})
     Tw(CL1,TI(0.15),{BackgroundColor3=C.White}); Tw(CL2,TI(0.15),{BackgroundColor3=C.White})
@@ -956,6 +921,7 @@ N("Frame",{BackgroundColor3=C.IrisDim,BackgroundTransparency=0.5,
     Position=UDim2.new(0,8,0,BANNER_H-1),Size=UDim2.new(1,-16,0,1),
     BorderSizePixel=0,ZIndex=10,Parent=PanelFrame})
 
+-- Title bar drag (mouse + touch)
 local dragging,dragInput,dragStart,startPos
 TitleBar.InputBegan:Connect(function(i)
     if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
@@ -974,23 +940,24 @@ UserInputService.InputChanged:Connect(function(i)
     end
 end)
 
--- Scroll frame
+-- ── Scroll frame ───────────────────────────────────────────
 local ScrollFrame = N("ScrollingFrame",{
     BackgroundTransparency=1,
     Position=UDim2.new(0,5,0,BANNER_H+5),
     Size=UDim2.new(1,-10,1,-(BANNER_H+10)),
     CanvasSize=UDim2.new(0,0,0,0),
-    ScrollBarThickness=3,
+    ScrollBarThickness=IS_MOBILE and 0 or 3, -- hidden on mobile; use swipe
     ScrollBarImageColor3=C.Iris,
     ScrollBarImageTransparency=0.45,
     BorderSizePixel=0,ZIndex=5,Parent=PanelFrame
 })
 pcall(function() ScrollFrame.AutomaticCanvasSize=Enum.AutomaticSize.Y end)
 local CLayout = N("UIListLayout",{
-    Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder,
+    Padding=UDim.new(0,IS_MOBILE and 6 or 5),
+    SortOrder=Enum.SortOrder.LayoutOrder,
     HorizontalAlignment=Enum.HorizontalAlignment.Center,Parent=ScrollFrame
 })
-N("UIPadding",{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,8),
+N("UIPadding",{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,10),
     PaddingLeft=UDim.new(0,2),PaddingRight=UDim.new(0,2),Parent=ScrollFrame})
 CLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     if not pcall(function() ScrollFrame.AutomaticCanvasSize=Enum.AutomaticSize.Y end) then
@@ -998,7 +965,11 @@ CLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     end
 end)
 
--- PC UI Components
+-- ============================================================
+--  SHARED UI COMPONENT BUILDERS
+-- ============================================================
+local VisualSetters = {}
+
 local function CreateSection(parent, title, order)
     local fr = N("Frame",{BackgroundColor3=C.IrisDark,BackgroundTransparency=0.55,
         Size=UDim2.new(1,-4,0,24),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
@@ -1013,19 +984,20 @@ local function CreateSection(parent, title, order)
 end
 
 local function CreateToggle(parent, labelText, enabledKey, callback, order)
-    local on  = Enabled[enabledKey] or false
+    local on = Enabled[enabledKey] or false
     local row = N("Frame",{BackgroundColor3=C.Surface,BackgroundTransparency=0.6,
-        Size=UDim2.new(1,-4,0,34),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
+        Size=UDim2.new(1,-4,0,ROW_TOGGLE_H),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
     Rnd(999,row); Bdr(row,C.Lift,1,0.5)
-    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.TextMid,
-        BackgroundTransparency=1,Size=UDim2.new(1,-56,1,0),Position=UDim2.new(0,14,0,0),
-        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,Parent=row})
+    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=IS_MOBILE and 12 or 11,
+        TextColor3=C.TextMid,BackgroundTransparency=1,Size=UDim2.new(1,-56,1,0),
+        Position=UDim2.new(0,14,0,0),TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,Parent=row})
     local track = N("Frame",{BackgroundColor3=on and C.IrisDim or C.Void,
-        Size=UDim2.new(0,36,0,19),Position=UDim2.new(1,-44,0.5,-9.5),ZIndex=8,Parent=row})
+        Size=UDim2.new(0,TRACK_W,0,TRACK_H),
+        Position=UDim2.new(1,-(TRACK_W+8),0.5,-TRACK_H/2),ZIndex=8,Parent=row})
     Rnd(999,track); Bdr(track,C.IrisDark,1,0.3)
     local knob = N("Frame",{BackgroundColor3=on and C.White or C.TextLow,
-        AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(0,13,0,13),
-        Position=UDim2.new(0,on and 20 or 3,0.5,0),ZIndex=9,Parent=track})
+        AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(0,KNOB_SZ,0,KNOB_SZ),
+        Position=UDim2.new(0,on and KNOB_ON or 3,0.5,0),ZIndex=9,Parent=track})
     Rnd(999,knob)
     local btn = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=10,Parent=row})
     btn.MouseEnter:Connect(function() Tw(row,TI(0.15),{BackgroundTransparency=0.35}) end)
@@ -1035,13 +1007,13 @@ local function CreateToggle(parent, labelText, enabledKey, callback, order)
         on = state
         Tw(track,TI(0.2),{BackgroundColor3=on and C.IrisDim or C.Void})
         Tw(knob,TI(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
-            {Position=UDim2.new(0,on and 20 or 3,0.5,0), BackgroundColor3=on and C.White or C.TextLow})
+            {Position=UDim2.new(0,on and KNOB_ON or 3,0.5,0),BackgroundColor3=on and C.White or C.TextLow})
         if not skipCb and callback then callback(on) end
     end
     VisualSetters[enabledKey] = setVisual
 
     btn.MouseButton1Click:Connect(function()
-        on = not on; Enabled[enabledKey] = on; setVisual(on)
+        on=not on; Enabled[enabledKey]=on; setVisual(on)
     end)
     return row
 end
@@ -1049,25 +1021,30 @@ end
 local function CreateSlider(parent, labelText, minVal, maxVal, valueKey, callback, order)
     local val = Values[valueKey]
     local row = N("Frame",{BackgroundColor3=C.Surface,BackgroundTransparency=0.6,
-        Size=UDim2.new(1,-4,0,50),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
+        Size=UDim2.new(1,-4,0,ROW_SLIDER_H),LayoutOrder=order or 0,ZIndex=7,Parent=parent})
     Rnd(999,row); Bdr(row,C.Lift,1,0.5)
-    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.TextMid,
+    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=IS_MOBILE and 12 or 11,TextColor3=C.TextMid,
         BackgroundTransparency=1,Size=UDim2.new(1,-56,0,18),Position=UDim2.new(0,14,0,5),
         TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8,Parent=row})
-    local valLbl = N("TextLabel",{Text=tostring(val),Font=Enum.Font.GothamBold,TextSize=11,
-        TextColor3=C.Iris,BackgroundTransparency=1,Size=UDim2.new(0,44,0,18),
-        Position=UDim2.new(1,-52,0,5),TextXAlignment=Enum.TextXAlignment.Right,ZIndex=8,Parent=row})
-    local track = N("Frame",{BackgroundColor3=C.Void,Size=UDim2.new(1,-24,0,5),
-        Position=UDim2.new(0,12,0,32),ZIndex=8,Parent=row})
+    local valLbl = N("TextLabel",{Text=tostring(val),Font=Enum.Font.GothamBold,
+        TextSize=IS_MOBILE and 12 or 11,TextColor3=C.Iris,BackgroundTransparency=1,
+        Size=UDim2.new(0,44,0,18),Position=UDim2.new(1,-52,0,5),
+        TextXAlignment=Enum.TextXAlignment.Right,ZIndex=8,Parent=row})
+    local trackY = IS_MOBILE and 34 or 32
+    local track = N("Frame",{BackgroundColor3=C.Void,
+        Size=UDim2.new(1,-24,0,IS_MOBILE and 6 or 5),
+        Position=UDim2.new(0,12,0,trackY),ZIndex=8,Parent=row})
     Rnd(999,track); Bdr(track,C.Lift,1,0.6)
     local pct  = (val-minVal)/(maxVal-minVal)
     local fill = N("Frame",{BackgroundColor3=C.Iris,Size=UDim2.new(pct,0,1,0),ZIndex=9,Parent=track})
     Rnd(999,fill)
     Grad(fill,ColorSequence.new({ColorSequenceKeypoint.new(0,C.IrisDim),ColorSequenceKeypoint.new(1,C.IrisBright)}))
-    local hitZ   = N("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,30),
-        Position=UDim2.new(0,0,0.5,-15),ZIndex=11,Parent=track})
+    local hitZ = N("Frame",{BackgroundTransparency=1,
+        Size=UDim2.new(1,0,0,SLIDER_HIT_H),
+        Position=UDim2.new(0,0,0.5,-SLIDER_HIT_H/2),ZIndex=11,Parent=track})
     local handle = N("Frame",{BackgroundColor3=C.White,AnchorPoint=Vector2.new(0.5,0.5),
-        Size=UDim2.new(0,13,0,13),Position=UDim2.new(pct,0,0.5,0),ZIndex=10,Parent=track})
+        Size=UDim2.new(0,SLIDER_HNDL_SZ,0,SLIDER_HNDL_SZ),
+        Position=UDim2.new(pct,0,0.5,0),ZIndex=10,Parent=track})
     Rnd(999,handle); Bdr(handle,C.IrisBright,1.5,0)
     local draggingS = false
     local function upd(x)
@@ -1076,7 +1053,7 @@ local function CreateSlider(parent, labelText, minVal, maxVal, valueKey, callbac
         valLbl.Text = tostring(val)
         Tw(fill,TI(0.04),{Size=UDim2.new(r,0,1,0)})
         Tw(handle,TI(0.04),{Position=UDim2.new(r,0,0.5,0)})
-        Values[valueKey] = val
+        Values[valueKey]=val
         if callback then callback(val) end
     end
     hitZ.InputBegan:Connect(function(i)
@@ -1095,11 +1072,52 @@ local function CreateSlider(parent, labelText, minVal, maxVal, valueKey, callbac
     return row
 end
 
--- PC OD logo circle
-local chSize   = 48
+-- ── Progress bar ───────────────────────────────────────────
+local pbar = N("Frame",{Size=UDim2.new(0,PBAR_W,0,44),
+    Position=UDim2.new(0.5,-PBAR_W/2,1,-110),
+    BackgroundColor3=C.Panel,BorderSizePixel=0,ZIndex=10,Parent=Gui})
+Rnd(14,pbar)
+local pStroke = Bdr(pbar,C.Iris,2.5,0)
+local pGrad   = N("UIGradient",{Parent=pStroke})
+pGrad.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0,   C.Iris),
+    ColorSequenceKeypoint.new(0.25,C.IrisDim),
+    ColorSequenceKeypoint.new(0.5, C.IrisBright),
+    ColorSequenceKeypoint.new(0.75,C.IrisDim),
+    ColorSequenceKeypoint.new(1,   C.Iris),
+})
+task.spawn(function()
+    local r=0
+    while pbar.Parent do r=(r+2)%360; pGrad.Rotation=r; task.wait(0.02) end
+end)
+ProgressLabel = N("TextLabel",{Size=UDim2.new(0.55,0,1,0),Position=UDim2.new(0,14,0,0),
+    BackgroundTransparency=1,Text="READY",TextColor3=C.White,
+    Font=Enum.Font.GothamBold,TextSize=14,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=12,Parent=pbar})
+ProgressPercentLabel = N("TextLabel",{Size=UDim2.new(0.4,0,1,0),Position=UDim2.new(0.3,0,0,0),
+    BackgroundTransparency=1,Text="",TextColor3=C.IrisBright,
+    Font=Enum.Font.GothamBlack,TextSize=13,TextXAlignment=Enum.TextXAlignment.Center,ZIndex=12,Parent=pbar})
+local statRadius = N("TextLabel",{Size=UDim2.new(0,38,1,0),Position=UDim2.new(1,-44,0,0),
+    BackgroundTransparency=1,Text=tostring(Values.STEAL_RADIUS),TextColor3=C.Iris,
+    Font=Enum.Font.GothamBold,TextSize=13,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=12,Parent=pbar})
+local pTrack = N("Frame",{Size=UDim2.new(1,-16,0,4),Position=UDim2.new(0,8,1,-7),
+    BackgroundColor3=C.Void,BorderSizePixel=0,ZIndex=11,Parent=pbar})
+Rnd(999,pTrack)
+ProgressBarFill = N("Frame",{Size=UDim2.new(0,0,1,0),BackgroundColor3=C.Iris,
+    BorderSizePixel=0,ZIndex=12,Parent=pTrack})
+Rnd(999,ProgressBarFill)
+Grad(ProgressBarFill,ColorSequence.new({
+    ColorSequenceKeypoint.new(0,C.IrisDim),ColorSequenceKeypoint.new(1,C.IrisBright)}))
+RunService.Heartbeat:Connect(function() statRadius.Text=tostring(Values.STEAL_RADIUS) end)
+
+-- ── OD floating logo / hide button ─────────────────────────
+local chSize = 48
+-- Logo goes above panel on PC; left of the panel on mobile (stays away from joystick)
+local chInitPos = IS_MOBILE
+    and UDim2.new(1,-(PANEL_W+10+chSize+6), 0.5, -(PANEL_H/2)-chSize/2)
+    or  UDim2.new(0, 16, 0.5, -(PANEL_H/2)-chSize-10)
+
 local chCircle = N("Frame",{Name="OD_Logo",
-    Size=UDim2.new(0,chSize,0,chSize),
-    Position=UDim2.new(0,16,0.5,-(PANEL_H/2)-chSize-10),
+    Size=UDim2.new(0,chSize,0,chSize),Position=chInitPos,
     BackgroundColor3=Color3.fromRGB(12,4,28),BorderSizePixel=0,ZIndex=50,Parent=Gui})
 Rnd(999,chCircle)
 local chStroke = Bdr(chCircle,C.Iris,2.5,0)
@@ -1117,7 +1135,7 @@ N("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Font=Enum.Font.G
     Text="OD",TextColor3=C.White,TextSize=16,
     TextXAlignment=Enum.TextXAlignment.Center,TextYAlignment=Enum.TextYAlignment.Center,
     ZIndex=51,Parent=chCircle})
-local chBtn    = N("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=52,Parent=chCircle})
+local chBtn = N("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=52,Parent=chCircle})
 
 local uiVisible = true
 local cMoved    = false
@@ -1136,7 +1154,7 @@ chBtn.InputBegan:Connect(function(i)
 end)
 UserInputService.InputChanged:Connect(function(i)
     if cDrag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-        local d = i.Position-cDragStart
+        local d=i.Position-cDragStart
         if d.Magnitude>4 then
             cMoved=true
             chCircle.Position=UDim2.new(cDragPos.X.Scale,cDragPos.X.Offset+d.X,cDragPos.Y.Scale,cDragPos.Y.Offset+d.Y)
@@ -1144,47 +1162,54 @@ UserInputService.InputChanged:Connect(function(i)
     end
 end)
 
--- PC Sections
+-- ============================================================
+--  POPULATE SECTIONS  (identical list; keybind hints hidden on mobile)
+-- ============================================================
+local function kb(key) return IS_MOBILE and "" or (" ["..key.."]") end
+
 local order = 1
-CreateSection(ScrollFrame,"⚡  MOVEMENT",order) order+=1
-CreateToggle(ScrollFrame,"Speed Boost [V]","SpeedBoost",function(s)
+
+CreateSection(ScrollFrame,"⚡  MOVEMENT",order)                  order+=1
+CreateToggle(ScrollFrame,"Speed Boost"..kb("V"),"SpeedBoost",function(s)
     Enabled.SpeedBoost=s; if s then startSpeedBoost() else stopSpeedBoost() end end,order) order+=1
 CreateSlider(ScrollFrame,"Boost Speed",1,70,"BoostSpeed",function(v) Values.BoostSpeed=v end,order) order+=1
-CreateToggle(ScrollFrame,"Float [F]","Float",function(s)
+CreateToggle(ScrollFrame,"Float"..kb("F"),"Float",function(s)
     Enabled.Float=s; if s then startFloat() else stopFloat() end end,order) order+=1
 CreateToggle(ScrollFrame,"Gravity Mode","GalaxyMode",function(s)
     Enabled.GalaxyMode=s; if s then startGalaxyMode() else stopGalaxyMode() end end,order) order+=1
 CreateSlider(ScrollFrame,"Gravity %",25,130,"GalaxyGravityPercent",function(v)
     Values.GalaxyGravityPercent=v; if galaxyEnabled then galaxyAdjustJump() end end,order) order+=1
-CreateSection(ScrollFrame,"🐾  STEALING",order) order+=1
+
+CreateSection(ScrollFrame,"🐾  STEALING",order)                  order+=1
 CreateToggle(ScrollFrame,"Auto Grab","AutoSteal",function(s)
     Enabled.AutoSteal=s; if s then startAutoSteal() else stopAutoSteal() end end,order) order+=1
 CreateSlider(ScrollFrame,"Steal Radius",5,100,"STEAL_RADIUS",function(v) Values.STEAL_RADIUS=v end,order) order+=1
 CreateToggle(ScrollFrame,"Speed While Stealing","SpeedWhileStealing",function(s)
     Enabled.SpeedWhileStealing=s; if s then startSpeedWhileStealing() else stopSpeedWhileStealing() end end,order) order+=1
 CreateSlider(ScrollFrame,"Steal Speed",10,35,"StealingSpeedValue",function(v) Values.StealingSpeedValue=v end,order) order+=1
-CreateToggle(ScrollFrame,"Auto Right [E]","AutoRight",function(s)
+CreateToggle(ScrollFrame,"Auto Right"..kb("E"),"AutoRight",function(s)
     Enabled.AutoRight=s
     if s then
         Enabled.AutoLeft=false
         if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
         stopStealPath(); startStealPath(stealPath_Right)
     else stopStealPath() end end,order) order+=1
-CreateToggle(ScrollFrame,"Auto Left [Q]","AutoLeft",function(s)
+CreateToggle(ScrollFrame,"Auto Left"..kb("Q"),"AutoLeft",function(s)
     Enabled.AutoLeft=s
     if s then
         Enabled.AutoRight=false
         if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
         stopStealPath(); startStealPath(stealPath_Left)
     else stopStealPath() end end,order) order+=1
-CreateSection(ScrollFrame,"⚔️  COMBAT",order) order+=1
+
+CreateSection(ScrollFrame,"⚔️  COMBAT",order)                    order+=1
 CreateToggle(ScrollFrame,"Hit Circle","HitCircle",function(s)
     Enabled.HitCircle=s; if s then startHitCircle() else stopHitCircle() end end,order) order+=1
 CreateToggle(ScrollFrame,"Anti Ragdoll","AntiRagdoll",function(s)
     Enabled.AntiRagdoll=s; if s then startAntiRagdoll() else stopAntiRagdoll() end end,order) order+=1
 CreateToggle(ScrollFrame,"Spam Bat","SpamBat",function(s)
     Enabled.SpamBat=s; if s then startSpamBat() else stopSpamBat() end end,order) order+=1
-CreateToggle(ScrollFrame,"🎯 Bat Aimbot [X]","BatAimbot",function(s)
+CreateToggle(ScrollFrame,"🎯 Bat Aimbot"..kb("X"),"BatAimbot",function(s)
     Enabled.BatAimbot=s; if s then startBatAimbot() else stopBatAimbot() end end,order) order+=1
 CreateSlider(ScrollFrame,"Aimbot Speed",10,120,"BatAimbotSpeed",function(v) Values.BatAimbotSpeed=v end,order) order+=1
 CreateToggle(ScrollFrame,"Spin Bot","Helicopter",function(s)
@@ -1193,159 +1218,161 @@ CreateSlider(ScrollFrame,"Spin Speed",5,80,"SpinSpeed",function(v)
     Values.SpinSpeed=v; if helicopterBAV then helicopterBAV.AngularVelocity=Vector3.new(0,v,0) end end,order) order+=1
 CreateToggle(ScrollFrame,"Unwalk","Unwalk",function(s)
     Enabled.Unwalk=s; if s then startUnwalk() else stopUnwalk() end end,order) order+=1
-CreateSection(ScrollFrame,"✨  VISUAL & MISC",order) order+=1
+
+CreateSection(ScrollFrame,"✨  VISUAL & MISC",order)              order+=1
 CreateToggle(ScrollFrame,"Optimizer + XRay","OptimizerXRay",function(s)
     Enabled.OptimizerXRay=s
     if s then enableOptimizer(); enableXRay() else disableOptimizer(); disableXRay() end end,order) order+=1
 
--- PC Floating Action Buttons
-local floatBtnUpdateRight, floatBtnUpdateLeft, floatBtnUpdateFloat, floatBtnUpdateAimbot
+-- ============================================================
+--  PC-ONLY: Floating Action Buttons + Keybinds
+-- ============================================================
+if not IS_MOBILE then
+    local fbrR, fbrL, fbrF, fbrA  -- updater refs
 
-local function CreateFloatingButton(labelText, icon, defaultPos, enabledKey, onToggle)
-    local btnFrame = N("Frame",{BackgroundColor3=C.Panel,Position=defaultPos,
-        Size=UDim2.new(0,130,0,36),BorderSizePixel=0,ZIndex=20,Parent=Gui})
-    Rnd(12,btnFrame)
-    local fbStroke = Bdr(btnFrame,C.IrisDim,2,0)
-    Grad(btnFrame,ColorSequence.new{
-        ColorSequenceKeypoint.new(0,Color3.fromRGB(18,6,38)),
-        ColorSequenceKeypoint.new(1,Color3.fromRGB(8,3,20))
-    },nil,90)
-    local glowFrame = N("Frame",{BackgroundColor3=C.Iris,BackgroundTransparency=0.85,
-        Size=UDim2.new(1,6,1,6),Position=UDim2.new(0,-3,0,-3),BorderSizePixel=0,ZIndex=19,Parent=btnFrame})
-    Rnd(14,glowFrame)
-    N("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,8,0,0),Size=UDim2.new(0,26,1,0),
-        Font=Enum.Font.GothamBold,Text=icon,TextColor3=C.Iris,TextSize=15,ZIndex=22,Parent=btnFrame})
-    local textLabel = N("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,36,0,0),
-        Size=UDim2.new(1,-50,1,0),Font=Enum.Font.GothamBold,Text=labelText,
-        TextColor3=C.TextMid,TextSize=10,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=22,Parent=btnFrame})
-    local statusDot = N("Frame",{BackgroundColor3=Color3.fromRGB(40,20,70),Size=UDim2.new(0,8,0,8),
-        Position=UDim2.new(1,-14,0.5,-4),BorderSizePixel=0,ZIndex=22,Parent=btnFrame})
-    Rnd(999,statusDot)
-    local isActive = Enabled[enabledKey] or false
-    local function updateVisual(state)
-        isActive = state
-        Tw(statusDot, TI(0.2),{BackgroundColor3=state and C.Green or Color3.fromRGB(40,20,70)})
-        Tw(btnFrame,  TI(0.2),{BackgroundColor3=state and Color3.fromRGB(25,8,55) or C.Panel})
-        Tw(glowFrame, TI(0.2),{BackgroundTransparency=state and 0.6 or 0.85})
-        Tw(textLabel, TI(0.2),{TextColor3=state and C.IrisBright or C.TextMid})
-        Tw(fbStroke,  TI(0.2),{Color=state and C.Iris or C.IrisDim})
+    local function CreateFloatingButton(labelText, icon, defaultPos, enabledKey, onToggle)
+        local btnFrame = N("Frame",{BackgroundColor3=C.Panel,Position=defaultPos,
+            Size=UDim2.new(0,130,0,36),BorderSizePixel=0,ZIndex=20,Parent=Gui})
+        Rnd(12,btnFrame)
+        local fbStroke = Bdr(btnFrame,C.IrisDim,2,0)
+        Grad(btnFrame,ColorSequence.new{
+            ColorSequenceKeypoint.new(0,Color3.fromRGB(18,6,38)),
+            ColorSequenceKeypoint.new(1,Color3.fromRGB(8,3,20))},nil,90)
+        local glowFrame = N("Frame",{BackgroundColor3=C.Iris,BackgroundTransparency=0.85,
+            Size=UDim2.new(1,6,1,6),Position=UDim2.new(0,-3,0,-3),BorderSizePixel=0,ZIndex=19,Parent=btnFrame})
+        Rnd(14,glowFrame)
+        N("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,8,0,0),Size=UDim2.new(0,26,1,0),
+            Font=Enum.Font.GothamBold,Text=icon,TextColor3=C.Iris,TextSize=15,ZIndex=22,Parent=btnFrame})
+        local textLabel = N("TextLabel",{BackgroundTransparency=1,Position=UDim2.new(0,36,0,0),
+            Size=UDim2.new(1,-50,1,0),Font=Enum.Font.GothamBold,Text=labelText,
+            TextColor3=C.TextMid,TextSize=10,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=22,Parent=btnFrame})
+        local statusDot = N("Frame",{BackgroundColor3=Color3.fromRGB(40,20,70),Size=UDim2.new(0,8,0,8),
+            Position=UDim2.new(1,-14,0.5,-4),BorderSizePixel=0,ZIndex=22,Parent=btnFrame})
+        Rnd(999,statusDot)
+        local isActive = Enabled[enabledKey] or false
+        local function updateVisual(state)
+            isActive=state
+            Tw(statusDot,TI(0.2),{BackgroundColor3=state and C.Green or Color3.fromRGB(40,20,70)})
+            Tw(btnFrame, TI(0.2),{BackgroundColor3=state and Color3.fromRGB(25,8,55) or C.Panel})
+            Tw(glowFrame,TI(0.2),{BackgroundTransparency=state and 0.6 or 0.85})
+            Tw(textLabel,TI(0.2),{TextColor3=state and C.IrisBright or C.TextMid})
+            Tw(fbStroke, TI(0.2),{Color=state and C.Iris or C.IrisDim})
+        end
+        local clickBtn = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=23,Parent=btnFrame})
+        local fDrag,fDS,fSP,fMov = false,nil,nil,false
+        clickBtn.InputBegan:Connect(function(i)
+            if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+                fDrag=true; fMov=false; fDS=i.Position; fSP=btnFrame.Position
+                i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then fDrag=false end end)
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(i)
+            if fDrag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+                local d=i.Position-fDS
+                if d.Magnitude>5 then fMov=true
+                    btnFrame.Position=UDim2.new(fSP.X.Scale,fSP.X.Offset+d.X,fSP.Y.Scale,fSP.Y.Offset+d.Y) end
+            end
+        end)
+        clickBtn.MouseButton1Click:Connect(function()
+            if fMov then return end
+            isActive=not isActive; Enabled[enabledKey]=isActive; updateVisual(isActive); onToggle(isActive,updateVisual)
+        end)
+        task.spawn(function()
+            while btnFrame and btnFrame.Parent do
+                if isActive then
+                    Tw(glowFrame,TI(0.8,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,0,true),{BackgroundTransparency=0.72})
+                end
+                task.wait(0.9)
+            end
+        end)
+        return updateVisual
     end
-    local clickBtn = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=23,Parent=btnFrame})
-    local fDrag,fDS,fSP,fMov = false,nil,nil,false
-    clickBtn.InputBegan:Connect(function(i)
-        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-            fDrag=true; fMov=false; fDS=i.Position; fSP=btnFrame.Position
-            i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then fDrag=false end end)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
-        if fDrag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-            local d=i.Position-fDS
-            if d.Magnitude>5 then
-                fMov=true
-                btnFrame.Position=UDim2.new(fSP.X.Scale,fSP.X.Offset+d.X,fSP.Y.Scale,fSP.Y.Offset+d.Y)
-            end
-        end
-    end)
-    clickBtn.MouseButton1Click:Connect(function()
-        if fMov then return end
-        isActive=not isActive; Enabled[enabledKey]=isActive; updateVisual(isActive); onToggle(isActive,updateVisual)
-    end)
-    task.spawn(function()
-        while btnFrame and btnFrame.Parent do
-            if isActive then
-                Tw(glowFrame,TI(0.8,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,0,true),{BackgroundTransparency=0.72})
-            end
-            task.wait(0.9)
-        end
-    end)
-    return updateVisual
-end
 
-floatBtnUpdateRight = CreateFloatingButton("Auto Right [E]","➡",UDim2.new(1,-144,0.5,-64),"AutoRight",function(state)
-    if state then
-        Enabled.AutoLeft=false
-        if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
-        if floatBtnUpdateLeft then floatBtnUpdateLeft(false) end
-        stopStealPath(); startStealPath(stealPath_Right)
-    else stopStealPath() end
-end)
-floatBtnUpdateLeft = CreateFloatingButton("Auto Left [Q]","⬅",UDim2.new(1,-144,0.5,-22),"AutoLeft",function(state)
-    if state then
-        Enabled.AutoRight=false
-        if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
-        if floatBtnUpdateRight then floatBtnUpdateRight(false) end
-        stopStealPath(); startStealPath(stealPath_Left)
-    else stopStealPath() end
-end)
-floatBtnUpdateFloat = CreateFloatingButton("Float [F]","🚀",UDim2.new(1,-144,0.5,20),"Float",function(state)
-    Enabled.Float=state
-    if VisualSetters.Float then VisualSetters.Float(state,true) end
-    if state then startFloat() else stopFloat() end
-end)
-floatBtnUpdateAimbot = CreateFloatingButton("Bat Aimbot [X]","🎯",UDim2.new(1,-144,0.5,62),"BatAimbot",function(state)
-    Enabled.BatAimbot=state
-    if VisualSetters.BatAimbot then VisualSetters.BatAimbot(state,true) end
-    if state then startBatAimbot() else stopBatAimbot() end
-end)
-
--- PC Keybinds
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if gpe then return end
-    if input.KeyCode == Enum.KeyCode.Delete then
-        Gui:Destroy()
-    elseif input.KeyCode == Enum.KeyCode.U then
-        uiVisible = not uiVisible
-        MainContainer.Visible = uiVisible
-        Tw(chCircle,TI(0.2),{BackgroundColor3=uiVisible and Color3.fromRGB(12,4,28) or Color3.fromRGB(35,10,70)})
-    elseif input.KeyCode == KEYBINDS.SPEED then
-        Enabled.SpeedBoost = not Enabled.SpeedBoost
-        if VisualSetters.SpeedBoost then VisualSetters.SpeedBoost(Enabled.SpeedBoost) end
-        if Enabled.SpeedBoost then startSpeedBoost() else stopSpeedBoost() end
-    elseif input.KeyCode == KEYBINDS.FLOAT then
-        Enabled.Float = not Enabled.Float
-        if VisualSetters.Float then VisualSetters.Float(Enabled.Float) end
-        if floatBtnUpdateFloat then floatBtnUpdateFloat(Enabled.Float) end
-        if Enabled.Float then startFloat() else stopFloat() end
-    elseif input.KeyCode == KEYBINDS.BATAIMBOT then
-        Enabled.BatAimbot = not Enabled.BatAimbot
-        if VisualSetters.BatAimbot then VisualSetters.BatAimbot(Enabled.BatAimbot) end
-        if floatBtnUpdateAimbot then floatBtnUpdateAimbot(Enabled.BatAimbot) end
-        if Enabled.BatAimbot then startBatAimbot() else stopBatAimbot() end
-    elseif input.KeyCode == KEYBINDS.AUTORIGHT then
-        Enabled.AutoRight = not Enabled.AutoRight
-        if VisualSetters.AutoRight then VisualSetters.AutoRight(Enabled.AutoRight) end
-        if floatBtnUpdateRight then floatBtnUpdateRight(Enabled.AutoRight) end
-        if Enabled.AutoRight then
+    fbrR = CreateFloatingButton("Auto Right [E]","➡",UDim2.new(1,-144,0.5,-64),"AutoRight",function(state)
+        if state then
             Enabled.AutoLeft=false
             if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
-            if floatBtnUpdateLeft then floatBtnUpdateLeft(false) end
+            if fbrL then fbrL(false) end
             stopStealPath(); startStealPath(stealPath_Right)
         else stopStealPath() end
-    elseif input.KeyCode == KEYBINDS.AUTOLEFT then
-        Enabled.AutoLeft = not Enabled.AutoLeft
-        if VisualSetters.AutoLeft then VisualSetters.AutoLeft(Enabled.AutoLeft) end
-        if floatBtnUpdateLeft then floatBtnUpdateLeft(Enabled.AutoLeft) end
-        if Enabled.AutoLeft then
+    end)
+    fbrL = CreateFloatingButton("Auto Left [Q]","⬅",UDim2.new(1,-144,0.5,-22),"AutoLeft",function(state)
+        if state then
             Enabled.AutoRight=false
             if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
-            if floatBtnUpdateRight then floatBtnUpdateRight(false) end
+            if fbrR then fbrR(false) end
             stopStealPath(); startStealPath(stealPath_Left)
         else stopStealPath() end
-    end
-end)
+    end)
+    fbrF = CreateFloatingButton("Float [F]","🚀",UDim2.new(1,-144,0.5,20),"Float",function(state)
+        Enabled.Float=state
+        if VisualSetters.Float then VisualSetters.Float(state,true) end
+        if state then startFloat() else stopFloat() end
+    end)
+    fbrA = CreateFloatingButton("Bat Aimbot [X]","🎯",UDim2.new(1,-144,0.5,62),"BatAimbot",function(state)
+        Enabled.BatAimbot=state
+        if VisualSetters.BatAimbot then VisualSetters.BatAimbot(state,true) end
+        if state then startBatAimbot() else stopBatAimbot() end
+    end)
 
--- PC Animation
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        if input.KeyCode==Enum.KeyCode.Delete then
+            Gui:Destroy()
+        elseif input.KeyCode==Enum.KeyCode.U then
+            uiVisible=not uiVisible; MainContainer.Visible=uiVisible
+            Tw(chCircle,TI(0.2),{BackgroundColor3=uiVisible and Color3.fromRGB(12,4,28) or Color3.fromRGB(35,10,70)})
+        elseif input.KeyCode==KEYBINDS.SPEED then
+            Enabled.SpeedBoost=not Enabled.SpeedBoost
+            if VisualSetters.SpeedBoost then VisualSetters.SpeedBoost(Enabled.SpeedBoost) end
+            if Enabled.SpeedBoost then startSpeedBoost() else stopSpeedBoost() end
+        elseif input.KeyCode==KEYBINDS.FLOAT then
+            Enabled.Float=not Enabled.Float
+            if VisualSetters.Float then VisualSetters.Float(Enabled.Float) end
+            if fbrF then fbrF(Enabled.Float) end
+            if Enabled.Float then startFloat() else stopFloat() end
+        elseif input.KeyCode==KEYBINDS.BATAIMBOT then
+            Enabled.BatAimbot=not Enabled.BatAimbot
+            if VisualSetters.BatAimbot then VisualSetters.BatAimbot(Enabled.BatAimbot) end
+            if fbrA then fbrA(Enabled.BatAimbot) end
+            if Enabled.BatAimbot then startBatAimbot() else stopBatAimbot() end
+        elseif input.KeyCode==KEYBINDS.AUTORIGHT then
+            Enabled.AutoRight=not Enabled.AutoRight
+            if VisualSetters.AutoRight then VisualSetters.AutoRight(Enabled.AutoRight) end
+            if fbrR then fbrR(Enabled.AutoRight) end
+            if Enabled.AutoRight then
+                Enabled.AutoLeft=false
+                if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
+                if fbrL then fbrL(false) end
+                stopStealPath(); startStealPath(stealPath_Right)
+            else stopStealPath() end
+        elseif input.KeyCode==KEYBINDS.AUTOLEFT then
+            Enabled.AutoLeft=not Enabled.AutoLeft
+            if VisualSetters.AutoLeft then VisualSetters.AutoLeft(Enabled.AutoLeft) end
+            if fbrL then fbrL(Enabled.AutoLeft) end
+            if Enabled.AutoLeft then
+                Enabled.AutoRight=false
+                if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
+                if fbrR then fbrR(false) end
+                stopStealPath(); startStealPath(stealPath_Left)
+            else stopStealPath() end
+        end
+    end)
+end -- end not IS_MOBILE
+
+-- ============================================================
+--  ANIMATE  (shared)
+-- ============================================================
 local _t, _sy = 0, -4.0
 RunService.Heartbeat:Connect(function(dt)
-    _t  = _t  + dt
+    _t  = _t + dt
     _sy = _sy + 48*dt
     if _sy > H+5 then _sy = -4 end
     for _, s in ipairs(stars) do
-        s.x = s.x+s.vx; s.y = s.y+s.vy
+        s.x=s.x+s.vx; s.y=s.y+s.vy
         if s.x>W+3 then s.x=-3 elseif s.x<-3 then s.x=W+3 end
         if s.y>H+3 then s.y=-3 elseif s.y<-3 then s.y=H+3 end
-        s.f.Position         = UDim2.new(0,s.x,0,s.y)
+        s.f.Position = UDim2.new(0,s.x,0,s.y)
         s.f.BackgroundTransparency = math.clamp(s.base+math.sin(_t*s.ts+s.ph)*0.2,0.05,0.95)
     end
     Scan.Position             = UDim2.new(0,0,0,_sy)
@@ -1360,506 +1387,22 @@ RunService.RenderStepped:Connect(function(dt)
     IslandLbl.Text = "FPS: "..fps.." | PING: "..ping.."ms"
 end)
 
--- PC Entrance animation
-MainContainer.Size    = UDim2.new(0,PANEL_W,0,0)
-MainContainer.Position= UDim2.new(0,16,0.5,0)
-Tw(MainContainer,TI(0.55,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
-    {Size=UDim2.new(0,PANEL_W,0,PANEL_H), Position=UDim2.new(0,16,0.5,-PANEL_H/2)})
+-- ── Entrance animation ──────────────────────────────────────
+-- PC slides in from the left; mobile slides in from the right
+local entryPos = IS_MOBILE
+    and UDim2.new(1, PANEL_W+20, 0.5, -PANEL_H/2)
+    or  UDim2.new(0,-(PANEL_W+20),0.5,-PANEL_H/2)
+
+MainContainer.Position = entryPos
+Tw(MainContainer, TI(0.55,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+    {Position = PANEL_ANCHOR_X})
 
 task.delay(0.7, function()
-    Notify("Orbit — Duels","PC version loaded",C.Iris)
+    Notify("Orbit — Duels", IS_MOBILE and "Mobile  ·  loaded ✓" or "PC  ·  loaded ✓", C.Iris)
 end)
 
 -- ============================================================
-else
--- ============================================================
---  MOBILE VERSION  — bottom sheet + touch-optimised grid
--- ============================================================
-
--- ── Mobile constants ───────────────────────────────────────
-local SHEET_H_OPEN   = 420  -- px when expanded
-local SHEET_H_CLOSED = 58   -- px when collapsed (just the handle bar)
-local GRID_BTN_H     = 52   -- touch target height for toggle buttons
-local SCREEN_W       = workspace.CurrentCamera.ViewportSize.X
-
--- ── Bottom sheet container ─────────────────────────────────
-local Sheet = N("Frame",{
-    Name = "MobileSheet",
-    BackgroundColor3 = Color3.fromRGB(10,4,22),
-    BorderSizePixel  = 0,
-    AnchorPoint      = Vector2.new(0.5,1),
-    Position         = UDim2.new(0.5,0,1,0),  -- start off-screen
-    Size             = UDim2.new(1,0,0,SHEET_H_OPEN),
-    ClipsDescendants = true,
-    ZIndex           = 40,
-    Parent           = Gui
-})
-Rnd(20,Sheet)
-Bdr(Sheet,C.Iris,1.5,0.2)
-Grad(Sheet,ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(20,7,44)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(6,2,14)),
-}),nil,180)
-
--- Mobile star field
-local mStars = {}
-local function MkMStar(l)
-    local sz  = ({1,2,2})[l]
-    local al  = ({0.5,0.35,0.2})[l]
-    local spd = ({0.015,0.04,0.09})[l]
-    local s   = N("Frame",{
-        BackgroundColor3=({C.IrisBright,C.Iris,Color3.fromRGB(210,140,255)})[l],
-        BackgroundTransparency=al, Size=UDim2.new(0,sz,0,sz),
-        Position=UDim2.new(0,math.random(0,400),0,math.random(0,SHEET_H_OPEN)),
-        ZIndex=41, Parent=Sheet
-    })
-    Rnd(sz,s)
-    local a = math.random()*6.28
-    table.insert(mStars,{f=s,x=math.random(0,400),y=math.random(0,SHEET_H_OPEN),
-        vx=math.cos(a)*spd,vy=math.sin(a)*spd,
-        ph=math.random()*6.28, ts=spd*18+math.random()*4, base=al})
-end
-for _=1,20 do MkMStar(1) end; for _=1,10 do MkMStar(2) end; for _=1,4 do MkMStar(3) end
-
--- Handle bar (drag zone)
-local Handle = N("Frame",{
-    BackgroundColor3=C.IrisDark,BackgroundTransparency=0.4,
-    Size=UDim2.new(1,0,0,SHEET_H_CLOSED),
-    ZIndex=50,Parent=Sheet
-})
-Grad(Handle,ColorSequence.new({
-    ColorSequenceKeypoint.new(0,Color3.fromRGB(22,8,50)),
-    ColorSequenceKeypoint.new(1,Color3.fromRGB(10,3,25)),
-}),nil,180)
-
--- Pill indicator
-local Pill = N("Frame",{BackgroundColor3=C.IrisDim,
-    AnchorPoint=Vector2.new(0.5,0),Size=UDim2.new(0,40,0,4),
-    Position=UDim2.new(0.5,0,0,8),ZIndex=55,Parent=Handle})
-Rnd(999,Pill)
-
--- Title + device badge
-local MobTitleLbl = N("TextLabel",{Text="ORBIT — DUELS",Font=Enum.Font.GothamBlack,TextSize=14,
-    TextColor3=C.IrisBright,BackgroundTransparency=1,
-    Position=UDim2.new(0,18,0,14),Size=UDim2.new(0.6,0,0,26),
-    TextXAlignment=Enum.TextXAlignment.Left,ZIndex=55,Parent=Handle})
-Grad(MobTitleLbl,ColorSequence.new({
-    ColorSequenceKeypoint.new(0,C.Iris),
-    ColorSequenceKeypoint.new(0.5,Color3.fromRGB(230,170,255)),
-    ColorSequenceKeypoint.new(1,C.Iris)
-}))
-
-N("TextLabel",{Text="📱 MOBILE",Font=Enum.Font.GothamBold,TextSize=9,
-    TextColor3=C.IrisDim,BackgroundTransparency=1,
-    Position=UDim2.new(0,18,0,34),Size=UDim2.new(0.5,0,0,14),
-    TextXAlignment=Enum.TextXAlignment.Left,ZIndex=55,Parent=Handle})
-
--- FPS/Ping badge (top-right of handle)
-local MobPingLbl = N("TextLabel",{Text="-- fps",Font=Enum.Font.GothamBold,TextSize=10,
-    TextColor3=C.Iris,BackgroundTransparency=1,
-    AnchorPoint=Vector2.new(1,0.5),
-    Position=UDim2.new(1,-14,0.5,0),Size=UDim2.new(0,100,0,20),
-    TextXAlignment=Enum.TextXAlignment.Right,ZIndex=55,Parent=Handle})
-
--- Close button
-local MobClose = N("Frame",{BackgroundColor3=C.DangerDark,
-    Size=UDim2.new(0,28,0,28),Position=UDim2.new(1,-48,0.5,-14),
-    ZIndex=56,Parent=Handle})
-Rnd(999,MobClose); Bdr(MobClose,C.DangerMid,1,0.3)
-local function MkMX(rot)
-    local f = N("Frame",{BackgroundColor3=C.DangerMid,AnchorPoint=Vector2.new(0.5,0.5),
-        Size=UDim2.new(0,12,0,2),Position=UDim2.new(0.5,0,0.5,0),Rotation=rot,ZIndex=58,Parent=MobClose})
-    Rnd(999,f); return f
-end
-MkMX(45); MkMX(-45)
-local MobCloseBtn = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=59,Parent=MobClose})
-MobCloseBtn.MouseButton1Click:Connect(function() Gui:Destroy() end)
-
--- Sheet open/close logic
-local sheetOpen = true
-local sheetMoving = false
-local function setSheet(open, instant)
-    if sheetMoving and not instant then return end
-    sheetMoving = true
-    sheetOpen = open
-    Tw(Pill,TI(0.2),{BackgroundColor3=open and C.Iris or C.IrisDim})
-    if instant then
-        Sheet.Position = UDim2.new(0.5,0,1,0)
-        task.wait()
-        Sheet.Position = UDim2.new(0.5,0,1,open and -SHEET_H_OPEN or -(SHEET_H_CLOSED))
-        sheetMoving = false
-    else
-        Tw(Sheet,TI(0.38,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
-            {Position=UDim2.new(0.5,0,1,open and -SHEET_H_OPEN or -(SHEET_H_CLOSED))})
-        task.delay(0.4,function() sheetMoving=false end)
-    end
-end
-
--- Handle tap to toggle
-local hDrag,hDS,hDY,hMoved = false,nil,nil,false
-Handle.InputBegan:Connect(function(i)
-    if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then
-        hDrag=true; hMoved=false; hDS=i.Position.Y; hDY=Sheet.Position.Y.Offset
-        i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then hDrag=false end end)
-    end
-end)
-UserInputService.InputChanged:Connect(function(i)
-    if not hDrag then return end
-    if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseMovement then
-        local dy = i.Position.Y - hDS
-        if math.abs(dy) > 6 then
-            hMoved=true
-            local newY = math.clamp(hDY+dy, -SHEET_H_OPEN, -SHEET_H_CLOSED)
-            Sheet.Position = UDim2.new(0.5,0,1,newY)
-        end
-    end
-end)
-UserInputService.InputEnded:Connect(function(i)
-    if not hDrag then return end
-    if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then
-        hDrag = false
-        if not hMoved then
-            setSheet(not sheetOpen)
-        else
-            -- snap based on position
-            local cur = Sheet.Position.Y.Offset
-            local mid = -(SHEET_H_OPEN+SHEET_H_CLOSED)/2
-            setSheet(cur < mid)
-        end
-    end
-end)
-
--- Separator
-N("Frame",{BackgroundColor3=C.IrisDim,BackgroundTransparency=0.5,
-    Position=UDim2.new(0,10,0,SHEET_H_CLOSED-1),Size=UDim2.new(1,-20,0,1),
-    BorderSizePixel=0,ZIndex=50,Parent=Sheet})
-
--- ── Mobile scroll content ──────────────────────────────────
-local MobScroll = N("ScrollingFrame",{
-    BackgroundTransparency=1,
-    Position=UDim2.new(0,0,0,SHEET_H_CLOSED+2),
-    Size=UDim2.new(1,0,1,-(SHEET_H_CLOSED+6)),
-    CanvasSize=UDim2.new(0,0,0,0),
-    ScrollBarThickness=2,
-    ScrollBarImageColor3=C.Iris,
-    ScrollBarImageTransparency=0.5,
-    BorderSizePixel=0,ZIndex=45,Parent=Sheet
-})
-pcall(function() MobScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y end)
-local MobLayout = N("UIListLayout",{
-    Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder,
-    HorizontalAlignment=Enum.HorizontalAlignment.Center,Parent=MobScroll
-})
-N("UIPadding",{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,12),
-    PaddingLeft=UDim.new(0,6),PaddingRight=UDim.new(0,6),Parent=MobScroll})
-MobLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    if not pcall(function() MobScroll.AutomaticCanvasSize=Enum.AutomaticSize.Y end) then
-        MobScroll.CanvasSize=UDim2.new(0,0,0,MobLayout.AbsoluteContentSize.Y+20)
-    end
-end)
-
--- ── Mobile UI builders ─────────────────────────────────────
-local function MobSection(title, order)
-    local fr = N("Frame",{BackgroundColor3=C.IrisDark,BackgroundTransparency=0.5,
-        Size=UDim2.new(1,-4,0,22),LayoutOrder=order,ZIndex=48,Parent=MobScroll})
-    Rnd(999,fr); Bdr(fr,C.IrisDim,1,0.6)
-    N("TextLabel",{Text=title:upper(),Font=Enum.Font.GothamBold,TextSize=9,TextColor3=C.IrisBright,
-        BackgroundTransparency=1,Size=UDim2.new(1,-16,1,0),Position=UDim2.new(0,12,0,0),
-        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=49,Parent=fr})
-    return fr
-end
-
--- Mobile toggle — full-width, large tap area
-local function MobToggle(labelText, icon, enabledKey, callback, order)
-    local on  = Enabled[enabledKey] or false
-    local row = N("Frame",{BackgroundColor3=on and Color3.fromRGB(22,8,52) or C.Surface,
-        BackgroundTransparency=0.35,
-        Size=UDim2.new(1,-4,0,GRID_BTN_H),LayoutOrder=order,ZIndex=48,Parent=MobScroll})
-    Rnd(14,row); Bdr(row,on and C.Iris or C.Lift,1,on and 0.4 or 0.6)
-
-    -- left icon blob
-    local iconBlob = N("Frame",{BackgroundColor3=on and C.IrisDark or C.Void,
-        Size=UDim2.new(0,36,0,36),Position=UDim2.new(0,8,0.5,-18),
-        ZIndex=49,Parent=row})
-    Rnd(10,iconBlob)
-    N("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),
-        Font=Enum.Font.GothamBold,Text=icon,TextColor3=C.Iris,TextSize=16,
-        TextXAlignment=Enum.TextXAlignment.Center,ZIndex=50,Parent=iconBlob})
-
-    -- label
-    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=12,TextColor3=on and C.IrisBright or C.TextMid,
-        BackgroundTransparency=1,Size=UDim2.new(1,-100,1,0),Position=UDim2.new(0,52,0,0),
-        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=49,Parent=row})
-
-    -- pill toggle on right
-    local track = N("Frame",{BackgroundColor3=on and C.IrisDim or C.Void,
-        Size=UDim2.new(0,42,0,23),Position=UDim2.new(1,-52,0.5,-11.5),ZIndex=49,Parent=row})
-    Rnd(999,track); Bdr(track,C.IrisDark,1,0.3)
-    local knob = N("Frame",{BackgroundColor3=on and C.White or C.TextLow,
-        AnchorPoint=Vector2.new(0,0.5),Size=UDim2.new(0,17,0,17),
-        Position=UDim2.new(0,on and 21 or 3,0.5,0),ZIndex=50,Parent=track})
-    Rnd(999,knob)
-
-    local rowStroke = row:FindFirstChildOfClass("UIStroke")
-    local rowLbl    = nil
-    for _, ch in ipairs(row:GetChildren()) do
-        if ch:IsA("TextLabel") then rowLbl = ch; break end
-    end
-
-    local function setVisual(state, skipCb)
-        on = state
-        Tw(track,TI(0.2),{BackgroundColor3=on and C.IrisDim or C.Void})
-        Tw(knob,TI(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
-            {Position=UDim2.new(0,on and 21 or 3,0.5,0), BackgroundColor3=on and C.White or C.TextLow})
-        Tw(row,TI(0.2),{BackgroundColor3=on and Color3.fromRGB(22,8,52) or C.Surface})
-        Tw(iconBlob,TI(0.2),{BackgroundColor3=on and C.IrisDark or C.Void})
-        if rowStroke then Tw(rowStroke,TI(0.2),{Color=on and C.Iris or C.Lift, Transparency=on and 0.4 or 0.6}) end
-        for _, ch in ipairs(row:GetChildren()) do
-            if ch:IsA("TextLabel") then Tw(ch,TI(0.2),{TextColor3=on and C.IrisBright or C.TextMid}) end
-        end
-        if not skipCb and callback then callback(on) end
-    end
-    VisualSetters[enabledKey] = setVisual
-
-    local btn = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=52,Parent=row})
-    btn.MouseButton1Click:Connect(function()
-        on = not on; Enabled[enabledKey] = on; setVisual(on)
-    end)
-    return row, setVisual
-end
-
--- Mobile slider — wider track, bigger handle for touch
-local function MobSlider(labelText, minVal, maxVal, valueKey, callback, order)
-    local val = Values[valueKey]
-    local row = N("Frame",{BackgroundColor3=C.Surface,BackgroundTransparency=0.5,
-        Size=UDim2.new(1,-4,0,56),LayoutOrder=order,ZIndex=48,Parent=MobScroll})
-    Rnd(14,row); Bdr(row,C.Lift,1,0.6)
-
-    N("TextLabel",{Text=labelText,Font=Enum.Font.Gotham,TextSize=11,TextColor3=C.TextMid,
-        BackgroundTransparency=1,Size=UDim2.new(0.7,0,0,20),Position=UDim2.new(0,14,0,4),
-        TextXAlignment=Enum.TextXAlignment.Left,ZIndex=49,Parent=row})
-    local valLbl = N("TextLabel",{Text=tostring(val),Font=Enum.Font.GothamBold,TextSize=12,
-        TextColor3=C.Iris,BackgroundTransparency=1,Size=UDim2.new(0.3,0,0,20),
-        Position=UDim2.new(0.7,-8,0,4),TextXAlignment=Enum.TextXAlignment.Right,ZIndex=49,Parent=row})
-
-    local track = N("Frame",{BackgroundColor3=C.Void,Size=UDim2.new(1,-28,0,6),
-        Position=UDim2.new(0,14,0,32),ZIndex=49,Parent=row})
-    Rnd(999,track); Bdr(track,C.Lift,1,0.6)
-    local pct  = (val-minVal)/(maxVal-minVal)
-    local fill = N("Frame",{BackgroundColor3=C.Iris,Size=UDim2.new(pct,0,1,0),ZIndex=50,Parent=track})
-    Rnd(999,fill)
-    Grad(fill,ColorSequence.new({ColorSequenceKeypoint.new(0,C.IrisDim),ColorSequenceKeypoint.new(1,C.IrisBright)}))
-
-    -- larger hit zone for mobile
-    local hitZ = N("Frame",{BackgroundTransparency=1,Size=UDim2.new(1,0,0,44),
-        Position=UDim2.new(0,0,0.5,-22),ZIndex=52,Parent=track})
-    local handle = N("Frame",{BackgroundColor3=C.White,AnchorPoint=Vector2.new(0.5,0.5),
-        Size=UDim2.new(0,18,0,18),Position=UDim2.new(pct,0,0.5,0),ZIndex=51,Parent=track})
-    Rnd(999,handle); Bdr(handle,C.IrisBright,2,0)
-
-    local draggingS = false
-    local function upd(x)
-        local r = math.clamp((x-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1)
-        val = math.floor(minVal+(maxVal-minVal)*r+0.5)
-        valLbl.Text = tostring(val)
-        Tw(fill,TI(0.04),{Size=UDim2.new(r,0,1,0)})
-        Tw(handle,TI(0.04),{Position=UDim2.new(r,0,0.5,0)})
-        Values[valueKey] = val
-        if callback then callback(val) end
-    end
-    hitZ.InputBegan:Connect(function(i)
-        if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then
-            draggingS=true; upd(i.Position.X)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
-        if not draggingS then return end
-        if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseMovement then
-            upd(i.Position.X)
-        end
-    end)
-    UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then
-            draggingS=false
-        end
-    end)
-    return row
-end
-
--- ── Populate mobile sections ───────────────────────────────
-local mo = 1
-
-MobSection("⚡  MOVEMENT", mo) mo+=1
-MobToggle("Speed Boost","⚡","SpeedBoost",function(s)
-    Enabled.SpeedBoost=s; if s then startSpeedBoost() else stopSpeedBoost() end end,mo) mo+=1
-MobSlider("Boost Speed",1,70,"BoostSpeed",function(v) Values.BoostSpeed=v end,mo) mo+=1
-MobToggle("Float","🚀","Float",function(s)
-    Enabled.Float=s; if s then startFloat() else stopFloat() end end,mo) mo+=1
-MobToggle("Gravity Mode","🌌","GalaxyMode",function(s)
-    Enabled.GalaxyMode=s; if s then startGalaxyMode() else stopGalaxyMode() end end,mo) mo+=1
-MobSlider("Gravity %",25,130,"GalaxyGravityPercent",function(v)
-    Values.GalaxyGravityPercent=v; if galaxyEnabled then galaxyAdjustJump() end end,mo) mo+=1
-
-MobSection("🐾  STEALING", mo) mo+=1
-MobToggle("Auto Grab","🐾","AutoSteal",function(s)
-    Enabled.AutoSteal=s; if s then startAutoSteal() else stopAutoSteal() end end,mo) mo+=1
-MobSlider("Steal Radius",5,100,"STEAL_RADIUS",function(v) Values.STEAL_RADIUS=v end,mo) mo+=1
-MobToggle("Speed While Stealing","💨","SpeedWhileStealing",function(s)
-    Enabled.SpeedWhileStealing=s; if s then startSpeedWhileStealing() else stopSpeedWhileStealing() end end,mo) mo+=1
-MobSlider("Steal Speed",10,35,"StealingSpeedValue",function(v) Values.StealingSpeedValue=v end,mo) mo+=1
-
-local _, mobSetRight = MobToggle("Auto Right","➡","AutoRight",function(s)
-    Enabled.AutoRight=s
-    if s then
-        Enabled.AutoLeft=false
-        if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
-        stopStealPath(); startStealPath(stealPath_Right)
-    else stopStealPath() end end,mo) mo+=1
-
-local _, mobSetLeft  = MobToggle("Auto Left","⬅","AutoLeft",function(s)
-    Enabled.AutoLeft=s
-    if s then
-        Enabled.AutoRight=false
-        if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
-        stopStealPath(); startStealPath(stealPath_Left)
-    else stopStealPath() end end,mo) mo+=1
-
-MobSection("⚔️  COMBAT", mo) mo+=1
-MobToggle("Hit Circle","🔵","HitCircle",function(s)
-    Enabled.HitCircle=s; if s then startHitCircle() else stopHitCircle() end end,mo) mo+=1
-MobToggle("Anti Ragdoll","🛡","AntiRagdoll",function(s)
-    Enabled.AntiRagdoll=s; if s then startAntiRagdoll() else stopAntiRagdoll() end end,mo) mo+=1
-MobToggle("Spam Bat","🏏","SpamBat",function(s)
-    Enabled.SpamBat=s; if s then startSpamBat() else stopSpamBat() end end,mo) mo+=1
-MobToggle("Bat Aimbot","🎯","BatAimbot",function(s)
-    Enabled.BatAimbot=s; if s then startBatAimbot() else stopBatAimbot() end end,mo) mo+=1
-MobSlider("Aimbot Speed",10,120,"BatAimbotSpeed",function(v) Values.BatAimbotSpeed=v end,mo) mo+=1
-MobToggle("Spin Bot","🌀","Helicopter",function(s)
-    Enabled.Helicopter=s; if s then startHelicopter() else stopHelicopter() end end,mo) mo+=1
-MobSlider("Spin Speed",5,80,"SpinSpeed",function(v)
-    Values.SpinSpeed=v; if helicopterBAV then helicopterBAV.AngularVelocity=Vector3.new(0,v,0) end end,mo) mo+=1
-MobToggle("Unwalk","🚶","Unwalk",function(s)
-    Enabled.Unwalk=s; if s then startUnwalk() else stopUnwalk() end end,mo) mo+=1
-
-MobSection("✨  VISUAL & MISC", mo) mo+=1
-MobToggle("Optimizer + XRay","👁","OptimizerXRay",function(s)
-    Enabled.OptimizerXRay=s
-    if s then enableOptimizer(); enableXRay() else disableOptimizer(); disableXRay() end end,mo) mo+=1
-
--- ── Mobile quick-access FABs (4 round buttons, top-right) ──
--- These float above the game so they're always accessible
-local FAB_SIZE = 52
-local FAB_X    = UDim2.new(1,-60,0,0)
-local fabDefs  = {
-    {key="AutoRight",   icon="➡", yOff=10,  enableKey="AutoRight"},
-    {key="AutoLeft",    icon="⬅", yOff=70,  enableKey="AutoLeft"},
-    {key="Float",       icon="🚀", yOff=130, enableKey="Float"},
-    {key="BatAimbot",   icon="🎯", yOff=190, enableKey="BatAimbot"},
-}
-
-local function CreateMobFAB(def)
-    local on = Enabled[def.enableKey] or false
-    local btn = N("Frame",{BackgroundColor3=on and C.IrisDark or C.Panel,
-        Size=UDim2.new(0,FAB_SIZE,0,FAB_SIZE),
-        Position=UDim2.new(1,-(FAB_SIZE+8),0,def.yOff),
-        ZIndex=60,Parent=Gui})
-    Rnd(16,btn)
-    local fabStroke = Bdr(btn,on and C.Iris or C.IrisDim,2,on and 0.2 or 0.5)
-    local glow = N("Frame",{BackgroundColor3=C.Iris,BackgroundTransparency=0.85,
-        Size=UDim2.new(1,8,1,8),Position=UDim2.new(0,-4,0,-4),
-        BorderSizePixel=0,ZIndex=59,Parent=btn})
-    Rnd(18,glow)
-    N("TextLabel",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),
-        Font=Enum.Font.GothamBold,Text=def.icon,TextColor3=C.White,TextSize=20,
-        TextXAlignment=Enum.TextXAlignment.Center,ZIndex=62,Parent=btn})
-
-    local function setV(state)
-        on = state
-        Tw(btn,TI(0.2),{BackgroundColor3=on and C.IrisDark or C.Panel})
-        Tw(fabStroke,TI(0.2),{Color=on and C.Iris or C.IrisDim, Transparency=on and 0.2 or 0.5})
-        Tw(glow,TI(0.2),{BackgroundTransparency=on and 0.6 or 0.85})
-    end
-
-    -- drag logic
-    local fDrag,fDS,fSP,fMov = false,nil,nil,false
-    local clickBtn = N("TextButton",{BackgroundTransparency=1,Size=UDim2.new(1,0,1,0),Text="",ZIndex=63,Parent=btn})
-    clickBtn.InputBegan:Connect(function(i)
-        if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then
-            fDrag=true; fMov=false; fDS=i.Position; fSP=btn.Position
-            i.Changed:Connect(function() if i.UserInputState==Enum.UserInputState.End then fDrag=false end end)
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
-        if fDrag and (i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseMovement) then
-            local d=i.Position-fDS
-            if d.Magnitude>6 then
-                fMov=true
-                btn.Position=UDim2.new(fSP.X.Scale,fSP.X.Offset+d.X,fSP.Y.Scale,fSP.Y.Offset+d.Y)
-            end
-        end
-    end)
-    clickBtn.MouseButton1Click:Connect(function()
-        if fMov then return end
-        on = not on; Enabled[def.enableKey] = on
-        setV(on)
-        if VisualSetters[def.enableKey] then VisualSetters[def.enableKey](on, true) end
-        -- trigger callbacks
-        if def.enableKey == "AutoRight" then
-            if on then
-                Enabled.AutoLeft=false
-                if VisualSetters.AutoLeft then VisualSetters.AutoLeft(false,true) end
-                stopStealPath(); startStealPath(stealPath_Right)
-            else stopStealPath() end
-        elseif def.enableKey == "AutoLeft" then
-            if on then
-                Enabled.AutoRight=false
-                if VisualSetters.AutoRight then VisualSetters.AutoRight(false,true) end
-                stopStealPath(); startStealPath(stealPath_Left)
-            else stopStealPath() end
-        elseif def.enableKey == "Float" then
-            if on then startFloat() else stopFloat() end
-        elseif def.enableKey == "BatAimbot" then
-            if on then startBatAimbot() else stopBatAimbot() end
-        end
-    end)
-    return setV
-end
-
-for _, d in ipairs(fabDefs) do CreateMobFAB(d) end
-
--- ── Mobile animation ───────────────────────────────────────
-local _mt = 0
-RunService.Heartbeat:Connect(function(dt)
-    _mt = _mt + dt
-    local sw = workspace.CurrentCamera.ViewportSize.X
-    for _, s in ipairs(mStars) do
-        s.x = s.x+s.vx; s.y = s.y+s.vy
-        if s.x>sw+2  then s.x=-2 elseif s.x<-2  then s.x=sw+2 end
-        if s.y>SHEET_H_OPEN+2 then s.y=-2 elseif s.y<-2 then s.y=SHEET_H_OPEN+2 end
-        s.f.Position = UDim2.new(0,s.x,0,s.y)
-        s.f.BackgroundTransparency = math.clamp(s.base+math.sin(_mt*s.ts+s.ph)*0.18,0.05,0.95)
-    end
-    MobTitleLbl.TextColor3 = C.Iris:Lerp(Color3.fromRGB(220,170,255),0.5+math.sin(_mt*0.9)*0.5)
-end)
-
-RunService.RenderStepped:Connect(function(dt)
-    local fps  = math.floor(1/dt)
-    local ping = 0
-    pcall(function() ping=math.floor(Stats_s.Network.ServerStatsItem["Data Ping"]:GetValue()) end)
-    MobPingLbl.Text = fps.."fps  "..ping.."ms"
-end)
-
--- Entrance: slide up from bottom
-task.delay(0.1, function()
-    setSheet(true, false)
-end)
-
--- ============================================================
-end  -- end IS_MOBILE branch
--- ============================================================
-
--- ============================================================
---  CHARACTER RESPAWN (shared)
+--  CHARACTER RESPAWN  (shared)
 -- ============================================================
 Player.CharacterAdded:Connect(function()
     task.wait(1)
