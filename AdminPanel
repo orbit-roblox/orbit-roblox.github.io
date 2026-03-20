@@ -1076,7 +1076,6 @@ local function attemptToHookButton(guiElement)
                 if scriptEnabled then triggerCustomStartUI(giftTarget) end
             end)
             table.insert(hookedButtons, blockOverlay)
-            print("Successfully hooked and blocked the Admin Commands purchase button!")
         end
     end
 end
